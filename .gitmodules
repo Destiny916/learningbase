@@ -1,0 +1,16 @@
+[submodule "algorithms/act"]
+	path = algorithms/act
+	url = http://192.168.10.28:3000/chengdu/lerobot_joint.git
+	branch = main
+[submodule "algorithms/act_dinov3"]
+	path = algorithms/act_dinov3
+	url = http://192.168.10.28:3000/chengdu/lerobot_joint.git
+	branch = feat/act-dinov3
+[submodule "algorithms/turbovla"]
+	path = algorithms/turbovla
+	url = http://192.168.10.28:3000/chengdu/turboVLA.git
+	branch = main
+[submodule "algorithms/turbovla_patchvision"]
+	path = algorithms/turbovla_patchvision
+	url = http://192.168.10.28:3000/chengdu/turboVLA.git
+	branch = feature/turbovla-patchvision-t2-act

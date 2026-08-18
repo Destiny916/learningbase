@@ -1,0 +1,8 @@
+.env
+.git
+.planning
+docs
+tests
+*.log
+__pycache__
+*.pyc

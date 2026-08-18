@@ -1,0 +1,34 @@
+# Local planning and editor state
+.planning/
+.idea/
+.vscode/
+
+# Python/runtime artifacts
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.venv/
+venv/
+
+# Secrets and machine-local environment files
+.env
+.env.*
+!.env.example
+
+# Datasets, checkpoints, and training output
+datasets/
+data/
+runs/
+outputs/
+wandb/
+checkpoints/
+*.safetensors
+*.pt
+*.pth
+*.ckpt
+
+# Existing local assets are intentionally not imported into this repository.
+/act_popcorn_45w/
+/w1_act-ljl-act_train/

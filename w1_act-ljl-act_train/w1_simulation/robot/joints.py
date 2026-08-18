@@ -1,0 +1,88 @@
+from __future__ import annotations
+
+BODY_JOINTS = (
+    "WAIST",
+    "LEFT_J1",
+    "LEFT_J2",
+    "LEFT_J3",
+    "LEFT_J4",
+    "LEFT_J5",
+    "LEFT_J6",
+    "LEFT_J7",
+    "NECK1",
+    "NECK2",
+    "RIGHT_J1",
+    "RIGHT_J2",
+    "RIGHT_J3",
+    "RIGHT_J4",
+    "RIGHT_J5",
+    "RIGHT_J6",
+    "RIGHT_J7",
+)
+
+LOCKED_BODY_JOINTS = (
+    "ANKLE",
+    "KNEE",
+    "BUTTOCK",
+)
+
+BODY_FEEDBACK_JOINTS = (
+    *LOCKED_BODY_JOINTS,
+    "WAIST",
+    "NECK1",
+    "NECK2",
+    "LEFT_J1",
+    "LEFT_J2",
+    "LEFT_J3",
+    "LEFT_J4",
+    "LEFT_J5",
+    "LEFT_J6",
+    "LEFT_J7",
+    "RIGHT_J1",
+    "RIGHT_J2",
+    "RIGHT_J3",
+    "RIGHT_J4",
+    "RIGHT_J5",
+    "RIGHT_J6",
+    "RIGHT_J7",
+)
+
+HAND_POSITION_JOINTS = (
+    "THUMBMCP",
+    "THUMBCMC",
+    "INDEXMCP",
+    "MIDDLEMCP",
+    "RINGMCP",
+    "LITTLEMCP",
+)
+
+HAND_POSITION_JOINTS_IN_URDF_ORDER = (
+    "THUMBCMC",
+    "THUMBMCP",
+    "INDEXMCP",
+    "MIDDLEMCP",
+    "RINGMCP",
+    "LITTLEMCP",
+)
+
+LEFT_HAND_JOINTS = (
+    "LEFT_T_CMC_YAW",
+    "LEFT_T_MCP",
+    "LEFT_IF_MCP_PITCH",
+    "LEFT_MF_MCP_PITCH",
+    "LEFT_RF_MCP_PITCH",
+    "LEFT_LF_MCP_PITCH",
+)
+
+RIGHT_HAND_JOINTS = (
+    "RIGHT_T_CMC_YAW",
+    "RIGHT_T_MCP",
+    "RIGHT_IF_MCP_PITCH",
+    "RIGHT_MF_MCP_PITCH",
+    "RIGHT_RF_MCP_PITCH",
+    "RIGHT_LF_MCP_PITCH",
+)
+
+ACTIVE_JOINTS = BODY_JOINTS + LEFT_HAND_JOINTS + RIGHT_HAND_JOINTS
+CONTROLLED_JOINTS = ACTIVE_JOINTS
+ACT_STATE_JOINTS = BODY_JOINTS + ("LEFT_GRIPPER", "RIGHT_GRIPPER")

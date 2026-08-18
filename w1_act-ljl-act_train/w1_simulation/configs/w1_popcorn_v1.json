@@ -1,0 +1,149 @@
+{
+  "schema_version": 1,
+  "name": "w1_popcorn_v1",
+  "paths": {
+    "checkpoint": "checkpoints/Act/popcorn/0450000/pretrained_model",
+    "origin": "dataset/origin/popcorn/normal/20260730_155257",
+    "artifacts": "w1_simulation/artifacts",
+    "urdf": "w1_simulation/urdf/dexforce_w1_v024_brainco_revo1_r/robot_with_ee.urdf",
+    "policy_script": "w1_simulation/runtime/policy_infer_act.py",
+    "bridge_script": "w1_simulation/runtime/bridge.py",
+    "whole_script": "w1_simulation/runtime/start_infer_lipo.sh"
+  },
+  "act": {
+    "chunk_size": 100,
+    "n_action_steps": 100,
+    "state_action_order": [
+      "WAIST",
+      "LEFT_J1",
+      "LEFT_J2",
+      "LEFT_J3",
+      "LEFT_J4",
+      "LEFT_J5",
+      "LEFT_J6",
+      "LEFT_J7",
+      "NECK1",
+      "NECK2",
+      "RIGHT_J1",
+      "RIGHT_J2",
+      "RIGHT_J3",
+      "RIGHT_J4",
+      "RIGHT_J5",
+      "RIGHT_J6",
+      "RIGHT_J7",
+      "LEFT_GRIPPER",
+      "RIGHT_GRIPPER"
+    ],
+    "image_keys": [
+      "observation.images.cam_high_left",
+      "observation.images.cam_hand_left",
+      "observation.images.cam_hand_right"
+    ]
+  },
+  "commands": {
+    "body_topic": "/control/joint_position",
+    "left_hand_topic": "/control/hand/left",
+    "right_hand_topic": "/control/hand/right",
+    "body_order": [
+      "WAIST",
+      "LEFT_J1",
+      "LEFT_J2",
+      "LEFT_J3",
+      "LEFT_J4",
+      "LEFT_J5",
+      "LEFT_J6",
+      "LEFT_J7",
+      "NECK1",
+      "NECK2",
+      "RIGHT_J1",
+      "RIGHT_J2",
+      "RIGHT_J3",
+      "RIGHT_J4",
+      "RIGHT_J5",
+      "RIGHT_J6",
+      "RIGHT_J7"
+    ],
+    "hand_order": [
+      "THUMBMCP",
+      "THUMBCMC",
+      "INDEXMCP",
+      "MIDDLEMCP",
+      "RINGMCP",
+      "LITTLEMCP"
+    ],
+    "locked_body_positions_rad": {
+      "ANKLE": 0.66317,
+      "KNEE": -1.32649,
+      "BUTTOCK": 0.66316
+    }
+  },
+  "hands": {
+    "left": {
+      "0": [0.0, 100.0, 35.0, 45.0, 47.0, 37.0],
+      "100": [0.0, 70.0, 0.0, 0.0, 0.0, 0.0]
+    },
+    "right": {
+      "0": [65.0, 100.0, 70.0, 75.0, 100.0, 100.0],
+      "100": [0.0, 70.0, 0.0, 0.0, 0.0, 0.0]
+    }
+  },
+  "camera_sources": {
+    "observation.images.cam_high_left": "head_left",
+    "observation.images.cam_hand_left": "hand_left",
+    "observation.images.cam_hand_right": "hand_right"
+  },
+  "simulation": {
+    "control_hz": 30.0,
+    "timestep": 0.0003333333333333333,
+    "frame_skip": 100,
+    "control_mode": "kinematic",
+    "raw": {
+      "execution_horizon": 100,
+      "replan_interval": 0
+    },
+    "bridge": {
+      "simulated_inference_ms": 200.0,
+      "inference_budget_ms": 300.0,
+      "policy_hz": 30.0,
+      "replan_threshold": 0.5,
+      "lipo_blend_policy_points": 5,
+      "replan_margin_policy_points": 2,
+      "sample_factor": 2
+    },
+    "visualization": {
+      "rerun_view_mode": "standard",
+      "eye_camera_width": 1280,
+      "eye_camera_height": 720,
+      "eye_camera_fps": 30.0,
+      "eye_camera_fovy": 70.0,
+      "eye_camera_scene": "grid"
+    }
+  },
+  "runtime": {
+    "server_port": 8888,
+    "joint_feedback_topic": "/feedback/robot_server_state",
+    "policy_hz": 20.0,
+    "sample_factor": 2,
+    "replan_threshold": 0.5,
+    "inference_budget_ms": 300.0,
+    "lipo_blend_policy_points": 5,
+    "replan_margin_policy_points": 2,
+    "camera_topics": {
+      "observation.images.cam_high_left": "/camera/left_eye_resize",
+      "observation.images.cam_hand_left": "/camera_l/color/image_rect_raw",
+      "observation.images.cam_hand_right": "/camera_r/color/image_rect_raw"
+    }
+  },
+  "hashes": {
+    "checkpoint_model_sha256": "50e733c4c49adca813f8e1920a72a2ef4e9d28afda2fa88cae051acdbfc3df12",
+    "checkpoint_train_config_sha256": "11f5caeda5234f7231cdbffeaa2e5315c3ed6153cb71ce8e96a43714da36b481",
+    "origin_metadata_sha256": "2bd6fe6c773f32dc0e2af6146b6b4559b1eb64ef6d1aa30b60aaed681f277bbb",
+    "origin_pose_sha256": "7e40f0469a43821e80d73e89eac7598bb87f2393e8a9f3d000cd8e537b5b0638",
+    "runtime_urdf_sha256": "9eeaa3748253ffe43671bba9c5cea2569a83fc354c1f322cb4a575af65f6e987",
+    "training_kinematics_urdf_sha256": "8cf7516b5ba5de7d8091b1db4254ab1879c0747fb506e2420805e4ce99fb714e"
+  },
+  "compatibility": {
+    "allow_training_runtime_urdf_hash_mismatch": true,
+    "reason": "The checkpoint kinematics URDF and the W1 simulation/runtime URDF are intentionally tracked separately."
+  }
+}

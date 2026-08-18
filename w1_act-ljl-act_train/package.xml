@@ -1,0 +1,9 @@
+<?xml version="1.0"?>
+<?xml-model href="http://download.ros.org/schema/package_format3.xsd" schematypens="http://www.w3.org/2001/XMLSchema"?>
+<package format="3">
+  <name>w1_act</name>
+  <version>0.4.5</version>
+  <description>W1 ACT inference application</description>
+  <maintainer email="dev@dexforce.com">DexForce Team</maintainer>
+  <license>Proprietary</license>
+</package>

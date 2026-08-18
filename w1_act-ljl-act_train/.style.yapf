@@ -1,0 +1,4 @@
+[style]
+# 基础继承 Google 风格
+based_on_style = google
+

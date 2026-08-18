@@ -1,0 +1,68 @@
+[build-system]
+requires = ["setuptools>=71"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "dexforce-w1-simulation"
+version = "0.1.0"
+description = "Standalone DexForce W1 ACT simulation and validation project"
+readme = "README.md"
+requires-python = ">=3.10,<3.14"
+dependencies = [
+    "lerobot>=0.4.4,<0.5.0",
+    "matplotlib>=3.9.0,<4.0.0",
+    "mujoco==3.3.7",
+    "numpy>=1.24.0",
+    "opencv-python-headless>=4.9.0,<4.13.0",
+    "pyarrow>=15.0.0",
+    "tensorboard==2.20.0",
+    "rerun-sdk>=0.26.0,<0.27.0",
+    "safetensors>=0.4.3",
+    "torch>=2.2.1,<2.11.0",
+]
+
+[project.optional-dependencies]
+test = ["pytest>=8.0.0,<10.0.0", "ruff>=0.12.0,<0.16.0"]
+
+[project.scripts]
+w1-simulation = "w1_simulation.launch:main"
+w1-simulation-verify = "w1_simulation.evaluation.verify:main"
+
+[tool.setuptools]
+include-package-data = false
+packages = [
+    "w1_simulation",
+    "w1_simulation.control",
+    "w1_simulation.evaluation",
+    "w1_simulation.inference",
+    "w1_simulation.observability",
+    "w1_simulation.replay",
+    "w1_simulation.robot",
+    "w1_simulation.runtime",
+    "w1_simulation.simulation",
+]
+
+[tool.setuptools.package-dir]
+w1_simulation = "."
+"w1_simulation.control" = "control"
+"w1_simulation.evaluation" = "evaluation"
+"w1_simulation.inference" = "inference"
+"w1_simulation.observability" = "observability"
+"w1_simulation.replay" = "replay"
+"w1_simulation.robot" = "robot"
+"w1_simulation.runtime" = "runtime"
+"w1_simulation.simulation" = "simulation"
+
+[tool.setuptools.package-data]
+w1_simulation = ["configs/*.json", "runtime/*.py", "runtime/*.sh"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests", "simulation/tests"]
+
+[tool.ruff]
+target-version = "py310"
+line-length = 110
+exclude = ["artifacts", "version_records"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "C4", "A"]

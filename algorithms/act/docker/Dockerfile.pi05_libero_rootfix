@@ -1,0 +1,9 @@
+FROM lerobot-pi05-libero-smoke:20260717-egl
+
+USER root
+
+RUN rm /opt/libero-package && \
+    ln -s /opt/conda/lib/python3.11/site-packages/libero/libero /opt/libero-package && \
+    ln -s /opt/libero-assets /opt/libero-package/assets && \
+    test -d /opt/libero-package/init_files/libero_spatial && \
+    test -d /opt/libero-package/assets

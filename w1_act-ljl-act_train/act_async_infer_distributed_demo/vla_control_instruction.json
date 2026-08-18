@@ -1,0 +1,45 @@
+{
+    "prompt": {
+            "抓蓝色的书。": "pick up the blue book and hold it out in front",
+            "抓前面蓝色的书": "pick up the blue book and hold it out in front",
+            "抓桌子上蓝色的书。": "pick up the blue book and hold it out in front",
+            "抓桌子上的蓝色书。": "pick up the blue book and hold it out in front",
+            "抓棕色的书。": "pick up the brown book and hold it out in front",
+            "抓棕色的猪。": "pick up the brown book and hold it out in front",
+            "抓前面棕色的书": "pick up the brown book and hold it out in front",
+            "抓桌子上棕色的书。": "pick up the brown book and hold it out in front",
+            "抓桌子上的棕色书。": "pick up the brown book and hold it out in front",
+            "抓中色的书。": "pick up the brown book and hold it out in front",
+            "抓棕色的。": "pick up the brown book and hold it out in front",
+            "刷棕色的书。": "pick up the brown book and hold it out in front",
+            "Pick up the brown book." :"pick up the brown book and hold it out in front",
+            "Pick up a brown book." :"pick up the brown book and hold it out in front",
+            "Pick up the blue book." : "pick up the blue book and hold it out in front",
+            "Pick up a blue book." : "pick up the blue book and hold it out in front"
+    },
+    "go_home": ["回到初始位置。","回初始位置。","Go home."],
+    "failed_detect_voice": "抱歉，我没有理解你的指令",
+    "command": {
+        "go_home_body" : [
+            "taskset", "-c", "2",
+            "python", "$W1_HOME/dexe_mobile_application/script/slowly_move_to.py", 
+            "$W1_HOME/dexe_mobile_application/script/records/pick_cup_r2s2r_no_handover_checkpoint-30000-reactive-multistage.json","200"
+        ],
+        "go_home_hand": [ "ros2", "topic", "pub","-1","/control/gripper/right","end_effector_interfaces/msg/EEJointControl","{value: [100]}"] 
+    },
+    "execute_task": {
+            "cpu_core": "2",
+            "server_host": "192.168.20.99",
+            "server_port": "8889",
+            "model_config": "$W1_ACT_HOME/act_async_infer_distributed_demo/scripts/client/client_config.json",
+            "control_frequency": "8",
+            "collect_frequency": "10",
+            "get_action_frequency": "10",
+            "chunk_size_threshold": "0.4",
+            "use_lipo": true,
+            "max_steps": "200",
+            "time_infer": "0.5",
+            "sample_factor": "2.0",
+            "debug": true
+        }
+}

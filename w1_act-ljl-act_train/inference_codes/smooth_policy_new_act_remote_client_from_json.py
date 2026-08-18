@@ -1,0 +1,845 @@
+#!/usr/bin/env python3
+# -*- coding: utf-8 -*-
+
+from __future__ import annotations
+import argparse
+import threading
+from collections import deque
+from dataclasses import dataclass
+from pathlib import Path
+from typing import Tuple, Optional, List, Dict
+
+import numpy as np
+import torch
+import rclpy
+from rclpy.node import Node
+from rclpy.qos import QoSProfile, ReliabilityPolicy, HistoryPolicy, DurabilityPolicy
+
+from std_msgs.msg import Float64
+from joint_interfaces.msg import JointPositionControl
+from sensor_msgs.msg import Image
+from cv_bridge import CvBridge
+from end_effector_interfaces.msg import EEFeedback, EEJointControl, EEJointControlMode
+from std_msgs.msg import String      # 新增
+import json
+from act_async_infer_distributed_demo.scripts.network_utils_act import NetworkClient
+try:
+    from task_interfaces.srv import SwitchPolicy
+    HAVE_SWITCH_POLICY_SERVICE = True
+except Exception:
+    SwitchPolicy = None
+    HAVE_SWITCH_POLICY_SERVICE = False
+
+try:
+    from w1_rollout.w1_rollout.w1_rollout_config import (
+        W1PositionCommand,
+        W1RolloutConfig,
+        W1RolloutGripperProcess,
+        W1RolloutRobotDoF,
+    )
+except ImportError:
+    from w1_rollout_config import (
+        W1PositionCommand,
+        W1RolloutConfig,
+        W1RolloutGripperProcess,
+        W1RolloutRobotDoF,
+    )
+
+# ===== Utils =====
+
+DEFAULT_CONFIG_PATH = Path(__file__).resolve().parents[1] / "test.json"
+
+
+def resolve_config_path(config_path: Optional[str]) -> Path:
+    if config_path is None:
+        return DEFAULT_CONFIG_PATH
+    path = Path(config_path).expanduser()
+    if not path.is_absolute():
+        path = (Path.cwd() / path).resolve()
+    return path
+
+def now_sec() -> float:
+    import time
+    return time.time()
+
+def nearest(buf: deque, t: float, tol_s: float) -> Optional[np.ndarray]:
+    """Return latest value in buf nearest to time t within tol."""
+    if not buf:
+        return None
+    dt = float(buf[-1][0] - t)
+    if abs(dt) <= tol_s:
+        return buf[-1][1]
+    return None
+
+def bgr_to_hwc_rgb_resized(img_bgr: np.ndarray, size: Tuple[int, int]) -> np.ndarray:
+    """BGR HxWx3 → RGB HWC uint8, resized to (W,H)."""
+    import cv2
+    tw, th = size
+    x = cv2.resize(img_bgr, (tw, th), interpolation=cv2.INTER_AREA)
+    x = cv2.cvtColor(x, cv2.COLOR_BGR2RGB)
+    return x
+
+# ===== Data containers =====
+
+@dataclass
+class TimedFrame:
+    t: float
+    left_bgr: np.ndarray
+    right_bgr: np.ndarray
+
+# ===== Node =====
+
+class W1ACTFlexibleNode(Node):
+    def __init__(self, config_path: Optional[str] = None) -> None:
+        super().__init__('w1_act_flexible_node')
+
+        resolved_config_path = resolve_config_path(config_path)
+        if not resolved_config_path.exists():
+            raise FileNotFoundError(f"Config JSON not found: {resolved_config_path}")
+        self.raw_config = json.loads(resolved_config_path.read_text(encoding="utf-8"))
+        self.config = W1RolloutConfig.from_json_file(str(resolved_config_path))
+        self.get_logger().info(f"Loaded rollout config: {resolved_config_path}")
+        self.policy_servers = self._build_policy_server_registry(self.raw_config)
+        self.default_policy_id = str(self.raw_config.get("default_policy_id", next(iter(self.policy_servers.keys()))))
+        if self.default_policy_id not in self.policy_servers:
+            raise ValueError(f"default_policy_id {self.default_policy_id!r} is not in policy_servers")
+        self.switch_policy_service = str(self.raw_config.get("switch_policy_service", "/w1_act/switch_policy"))
+        self.switch_policy_topic = str(self.raw_config.get("switch_policy_topic", "/w1_act/switch_policy_fallback"))
+        self.current_policy_topic = str(self.raw_config.get("current_policy_topic", "/w1_act/current_policy"))
+        self.active_policy_id: Optional[str] = None
+        self.network_client: Optional[NetworkClient] = None
+        self._policy_generation: int = 0
+
+
+        ALLOWED_IMAGE_KEYS = {
+            "observation.images.cam_high_left",
+            "observation.images.cam_high_right",
+            "observation.images.cam_hand_left",
+            "observation.images.cam_hand_right",
+        }
+        req_keys = list(self.config.image_keys)
+        self.config.image_keys = [k for k in req_keys if k in ALLOWED_IMAGE_KEYS]
+        if not self.config.image_keys:
+            raise ValueError("image_keys 不能为空：必须从四个允许键中至少选择一个。")
+
+        # ---------- Build IO order ----------
+        self.robot_dof = W1RolloutRobotDoF(config=self.config)
+        self.full_order: List[str] = list(self.robot_dof.full_order)
+        self.full_dim = int(self.robot_dof.full_dim)
+        self.body_order: List[str] = list(self.robot_dof.body_order)
+        self.idx_left_scalar: Optional[int] = self.robot_dof.idx_left_scalar
+        self.idx_right_scalar: Optional[int] = self.robot_dof.idx_right_scalar
+        self.slice_left_q6: Optional[Tuple[int, int]] = self.robot_dof.slice_left_q6
+        self.slice_right_q6: Optional[Tuple[int, int]] = self.robot_dof.slice_right_q6
+        self.body_index_map: Optional[np.ndarray] = self.robot_dof.body_index_map
+        self.gripper_processor = W1RolloutGripperProcess(config=self.config)
+
+        self.get_logger().info(
+            "=== Inference Order (len=%d) ===\n%s" %
+            (self.full_dim, "\n".join([f"{i:02d}: {n}" for i,n in enumerate(self.full_order)]))
+        )
+        self.get_logger().info(
+            f"[train IO] BODY={len(self.body_order)} HAND_MODE={self.config.hand_input_mode} sides={self.config.hand_sides} → full_dim={self.full_dim}"
+        )
+        if self.config.hand_input_mode == 'scalar':
+            self.get_logger().info(f"scalar idx: left={self.idx_left_scalar}, right={self.idx_right_scalar}")
+        elif self.config.hand_input_mode == 'qpos6':
+            self.get_logger().info(f"q6 slices: left={self.slice_left_q6}, right={self.slice_right_q6}")
+
+        if self.full_dim == 0:
+            raise RuntimeError("selected_body_names 展开后为空；请至少选择一个维度")
+
+        # ---------- QoS & pubs/subs ----------
+        q_reliable = QoSProfile(
+            reliability=ReliabilityPolicy.RELIABLE,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            durability=DurabilityPolicy.VOLATILE,
+        )
+        self.pub_action = self.create_publisher(JointPositionControl, self.config.publish_topic, q_reliable)
+        self.pub_set_left_qpos6 = self.create_publisher(EEJointControl, self.config.set_left_hand_qpos6_topic, q_reliable)
+        self.pub_set_right_qpos6 = self.create_publisher(EEJointControl, self.config.set_right_hand_qpos6_topic, q_reliable)
+        self.pub_current_policy = self.create_publisher(String, self.current_policy_topic, q_reliable)
+
+        # Buffers
+        self.body_buf: deque = deque(maxlen=2000)
+        self.hand_left_buf:  deque = deque(maxlen=200)
+        self.hand_right_buf: deque = deque(maxlen=200)
+        self.bridge = CvBridge()
+        self.scalar_left_buf: deque  = deque(maxlen=2000)
+        self.scalar_right_buf: deque = deque(maxlen=2000)
+        self.qpos6_left_buf: deque   = deque(maxlen=2000)
+        self.qpos6_right_buf: deque  = deque(maxlen=2000)
+
+        # Subs
+        q_img = QoSProfile(
+            reliability=ReliabilityPolicy.BEST_EFFORT,
+            history=HistoryPolicy.KEEP_LAST,
+            depth=10,
+            durability=DurabilityPolicy.VOLATILE,
+        )
+        if "observation.images.cam_hand_left" in self.config.image_keys:
+            self.create_subscription(Image, self.config.cam_hand_left_topic, self.cb_img_hand_left, q_img)
+            self.get_logger().info(f"Subscribe hand-left image: {self.config.cam_hand_left_topic}")
+        if "observation.images.cam_hand_right" in self.config.image_keys:
+            self.create_subscription(Image, self.config.cam_hand_right_topic, self.cb_img_hand_right, q_img)
+            self.get_logger().info(f"Subscribe hand-right image: {self.config.cam_hand_right_topic}")
+
+        self.create_subscription(String, self.config.joint_topic, self.cb_joint, q_reliable)
+        self.create_subscription(Float64, self.config.left_hand_scalar_topic, self.cb_scalar_left, q_reliable)
+        self.create_subscription(Float64, self.config.right_hand_scalar_topic, self.cb_scalar_right, q_reliable)
+        self.create_subscription(EEFeedback, self.config.left_hand_qpos6_topic, self.cb_qpos6_left, q_reliable)
+        self.create_subscription(EEFeedback, self.config.right_hand_qpos6_topic, self.cb_qpos6_right, q_reliable)
+        if HAVE_SWITCH_POLICY_SERVICE:
+            self.create_service(SwitchPolicy, self.switch_policy_service, self.handle_switch_policy_service)
+            self.get_logger().info(f"Advertise switch-policy service: {self.switch_policy_service}")
+        else:
+            self.get_logger().warn(
+                "SwitchPolicy service type unavailable; service disabled and topic fallback only."
+            )
+        self.create_subscription(String, self.switch_policy_topic, self.cb_switch_policy, q_reliable)
+        self.get_logger().info(f"Subscribe switch-policy fallback topic: {self.switch_policy_topic}")
+
+        self.get_logger().info("Using remote server for policy preprocess/postprocess.")
+        if not self._connect_policy_server(self.default_policy_id):
+            raise RuntimeError(
+                f"Could not connect to default policy server {self.default_policy_id}: "
+                f"{self.policy_servers[self.default_policy_id]}"
+            )
+        reset_resp = self.network_client.send_request("reset_policy")
+        if not reset_resp or reset_resp.get("status") != "ok":
+            self.get_logger().warn("reset_policy request failed, continue anyway.")
+        self.get_logger().info("Remote policy server connected.")
+
+        # ---------- Async planning buffers ----------
+        self.plan_lock = threading.Lock()
+        self.plan_queue: deque = deque()      # 每个元素: np.ndarray(full_dim)
+        self.replan_in_progress: bool = False
+
+        # horizon: 一次重推理拿多少帧 (例如30)
+        self.horizon_N: int = max(1, int(self.config.remote_horizon_n))
+        # <= 这个阈值时触发异步补货 (例如15)
+        if self.config.remote_replan_trigger > 0:
+            self.replan_trigger: int = int(self.config.remote_replan_trigger)
+        else:
+            self.replan_trigger = max(1, self.horizon_N // 2)
+        self.get_logger().info(
+            f"[Remote ACT] horizon_N={self.horizon_N}, "
+            f"replan_trigger={self.replan_trigger}"
+        )
+
+        # --- blend相关: chunk衔接淡化 ---
+        self.last_cmd_vec = np.zeros(self.full_dim, dtype=np.float32)
+        self.have_last_cmd = False
+        self.blend_steps = 20  # 过渡长度(帧数)，越小越"看不出来"
+
+        # Blend mask: do NOT blend gripper/hand dims (prevents 'grab then drop' at chunk boundary)
+        self.blend_mask = np.ones(self.full_dim, dtype=np.float32)
+        if self.config.hand_input_mode == 'scalar':
+            if self.idx_left_scalar is not None:
+                self.blend_mask[self.idx_left_scalar] = 0.0
+            if self.idx_right_scalar is not None:
+                self.blend_mask[self.idx_right_scalar] = 0.0
+        elif self.config.hand_input_mode == 'qpos6':
+            if self.slice_left_q6 is not None:
+                a,b = self.slice_left_q6
+                self.blend_mask[a:b] = 0.0
+            if self.slice_right_q6 is not None:
+                a,b = self.slice_right_q6
+                self.blend_mask[a:b] = 0.0
+
+        # Camera thread (SBS)
+        self.frame_lock = threading.Lock()
+        self.latest_frame: Optional[TimedFrame] = None
+        self._cap_stop = False
+        th = threading.Thread(target=self.capture_loop_sbs, daemon=True)
+        th.start()
+        self._cap_thread = th
+        self._publish_current_policy()
+
+        # Timer
+        period = 1.0 / max(1.0, float(self.config.policy_hz))
+        self.create_timer(period, self.timer_infer)
+
+    # ---------- Camera ----------
+    def capture_loop_sbs(self) -> None:
+        import cv2, time
+        cap = cv2.VideoCapture('/dev/video99', cv2.CAP_V4L2)
+        if not cap.isOpened():
+            cap = cv2.VideoCapture(99)
+        if not cap.isOpened():
+            self.get_logger().error('OpenCV cannot open /dev/video99 (or id 99).')
+            return
+
+        cap.set(cv2.CAP_PROP_FRAME_WIDTH, 3840)
+        cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1080)
+        cap.set(cv2.CAP_PROP_FPS, 30)
+
+        try:
+            while not self._cap_stop:
+                ok, frame = cap.read()
+                if not ok:
+                    time.sleep(0.005); continue
+                t = now_sec()
+                h, w2, _ = frame.shape
+                if w2 % 2 != 0:
+                    self.get_logger().warn(f'Frame width {w2} not even; skip')
+                    continue
+                w = w2 // 2
+                left_bgr  = frame[:, :w]
+                right_bgr = frame[:,  w:]
+                with self.frame_lock:
+                    self.latest_frame = TimedFrame(t=t, left_bgr=left_bgr, right_bgr=right_bgr)
+        finally:
+            cap.release()
+
+    # ---------- Subs ----------
+    def cb_joint(self, msg: String) -> None:
+        # 0. body_order 还是老逻辑
+        if len(self.body_order) == 0:
+            return
+
+        # 1. 解析 JSON 字符串
+        try:
+            data = json.loads(msg.data)
+        except json.JSONDecodeError as e:
+            self.get_logger().warn(f"JSON parse error in /feedback/robot_server_state: {e}")
+            return
+        
+        joint_pos = data.get("joint_position", None)
+        if joint_pos is None or len(joint_pos) != len(self.config.joint_names):
+            self.get_logger().warn(
+                f"joint_position length {0 if joint_pos is None else len(joint_pos)} "
+                f"!= expected {len(self.config.joint_names)}"
+            )
+            return
+
+        # 2. 时间戳 now_sec()
+        t = now_sec()
+        q_in = np.asarray(joint_pos, dtype=np.float32)
+       
+        # 3. body_index_map 在初始化阶段已由 W1RolloutRobotDoF 构建
+        if self.body_index_map is None:
+            self.get_logger().warn("body_index_map is empty; skip joint callback.")
+            return
+
+        # 4. 和原来一样：重排 + append 到 buf
+        try:
+            q_body = q_in[self.body_index_map]
+        except Exception as e:
+            self.get_logger().warn(f"Reorder BODY failed: {e}")
+            return
+        self.body_buf.append((t, q_body))
+
+    def cb_scalar_left(self, msg: Float64) -> None:
+        self.scalar_left_buf.append((now_sec(), float(msg.data)))
+
+    def cb_scalar_right(self, msg: Float64) -> None:
+        self.scalar_right_buf.append((now_sec(), float(msg.data)))
+
+    def _extract_ee_positions(self, msg: EEFeedback) -> Optional[np.ndarray]:
+        states = list(msg.joint_states)
+        if not states:
+            return None
+
+        joint_names = list(self.config.publish_hand_joint_name)
+        by_name = {state.name: float(state.position) for state in states}
+        if all(name in by_name for name in joint_names):
+            return np.asarray([by_name[name] for name in joint_names], dtype=np.float32)
+
+        if len(states) >= len(joint_names):
+            return np.asarray([state.position for state in states[:len(joint_names)]], dtype=np.float32)
+
+        return None
+
+    def cb_qpos6_left(self, msg: EEFeedback) -> None:
+        arr = self._extract_ee_positions(msg)
+        if arr is not None:
+            self.qpos6_left_buf.append((now_sec(), arr.copy()))
+
+    def cb_qpos6_right(self, msg: EEFeedback) -> None:
+        arr = self._extract_ee_positions(msg)
+        if arr is not None:
+            self.qpos6_right_buf.append((now_sec(), arr.copy()))
+
+    def cb_img_hand_left(self, msg: Image) -> None:
+        try:
+            bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        except Exception as e:
+            self.get_logger().warn(f"cv_bridge left-hand fail: {e}")
+            return
+        t = now_sec()
+        self.hand_left_buf.append((t, bgr))
+
+    def cb_img_hand_right(self, msg: Image) -> None:
+        try:
+            bgr = self.bridge.imgmsg_to_cv2(msg, desired_encoding="bgr8")
+        except Exception as e:
+            self.get_logger().warn(f"cv_bridge right-hand fail: {e}")
+            return
+        t = now_sec()
+        self.hand_right_buf.append((t, bgr))
+
+    def _make_action(self, act_np: np.ndarray) -> W1PositionCommand:
+        return self.robot_dof.make_action(
+            act_np=act_np,
+            processor=self.gripper_processor,
+            t_now_second=now_sec(),
+        )
+
+    def _publish_action(self, position_cmd: W1PositionCommand) -> None:
+        if position_cmd.robot_cmd is not None:
+            msg = JointPositionControl()
+            msg.header.stamp = self.get_clock().now().to_msg()
+            msg.name = list(position_cmd.robot_cmd.joint_names)
+            msg.position = list(position_cmd.robot_cmd.joint_values)
+            self.pub_action.publish(msg)
+
+        if position_cmd.left_hand_cmd is not None:
+            msg = EEJointControl()
+            msg.mode = EEJointControlMode.POSITION
+            msg.name = list(position_cmd.left_hand_cmd.joint_names)
+            msg.value = list(position_cmd.left_hand_cmd.joint_values)
+            self.pub_set_left_qpos6.publish(msg)
+
+        if position_cmd.right_hand_cmd is not None:
+            msg = EEJointControl()
+            msg.mode = EEJointControlMode.POSITION
+            msg.name = list(position_cmd.right_hand_cmd.joint_names)
+            msg.value = list(position_cmd.right_hand_cmd.joint_values)
+            self.pub_set_right_qpos6.publish(msg)
+
+    def _publish_action_vector(self, act_np: np.ndarray) -> None:
+        position_cmd = self._make_action(act_np)
+        self._publish_action(position_cmd)
+
+        # 记录：我们刚刚真的下发给机器人的这一帧
+        self.last_cmd_vec = act_np.astype(np.float32, copy=True)
+        self.have_last_cmd = True
+
+    def _make_seed_batch(
+    self,
+    obs_base: Dict[str, np.ndarray],
+    seed_vec_np: np.ndarray
+) -> Dict[str, np.ndarray]:
+        obs = dict(obs_base)
+        obs[self.config.state_key] = seed_vec_np.astype(np.float32)
+        batch_np: Dict[str, np.ndarray] = {}
+        for key, value in obs.items():
+            arr = np.asarray(value)
+            if arr.dtype == np.object_:
+                continue
+            batch_np[key] = arr
+        return batch_np
+
+    def _build_policy_server_registry(self, raw_config: Dict[str, object]) -> Dict[str, Dict[str, object]]:
+        raw_servers = raw_config.get("policy_servers")
+        normalized: Dict[str, Dict[str, object]] = {}
+        if isinstance(raw_servers, dict):
+            for policy_id, entry in raw_servers.items():
+                if not isinstance(entry, dict):
+                    continue
+                host = str(entry.get("host", "")).strip()
+                port = entry.get("port", None)
+                if not host or port is None:
+                    continue
+                normalized[str(policy_id)] = {"host": host, "port": int(port)}
+
+        if normalized:
+            return normalized
+
+        fallback_policy_id = str(raw_config.get("default_policy_id", "default"))
+        return {
+            fallback_policy_id: {
+                "host": str(self.config.remote_server_host),
+                "port": int(self.config.remote_server_port),
+            }
+        }
+
+    def _publish_current_policy(self) -> None:
+        msg = String()
+        msg.data = "" if self.active_policy_id is None else str(self.active_policy_id)
+        self.pub_current_policy.publish(msg)
+
+    def _close_network_client(self) -> None:
+        if self.network_client is None:
+            return
+        try:
+            self.network_client.close()
+        except Exception:
+            pass
+        self.network_client = None
+
+    def _connect_policy_server(self, policy_id: str) -> bool:
+        server = self.policy_servers.get(policy_id)
+        if server is None:
+            self.get_logger().error(f"Unknown policy_id: {policy_id}")
+            return False
+
+        host = str(server["host"])
+        port = int(server["port"])
+        self.get_logger().info(f"Connecting policy '{policy_id}' to {host}:{port}")
+        self._close_network_client()
+        candidate = NetworkClient(host, port)
+        if not candidate.connect(timeout=float(self.config.remote_connect_timeout_s)):
+            self.get_logger().error(f"Failed to connect policy '{policy_id}' at {host}:{port}")
+            return False
+
+        self.network_client = candidate
+        self.active_policy_id = policy_id
+        self.config.remote_server_host = host
+        self.config.remote_server_port = port
+        self.get_logger().info(f"Active policy server: {policy_id} -> {host}:{port}")
+        return True
+
+    def _invalidate_policy_runtime(self) -> None:
+        self._policy_generation += 1
+        with self.plan_lock:
+            self.plan_queue.clear()
+            self.replan_in_progress = False
+
+    def _switch_policy(self, policy_id: str, reason: str) -> tuple[bool, str]:
+        requested = policy_id.strip()
+        if not requested:
+            message = "Ignore empty policy switch request"
+            self.get_logger().warn(message)
+            return False, message
+        if requested not in self.policy_servers:
+            message = f"Requested policy '{requested}' is not configured"
+            self.get_logger().warn(message)
+            return False, message
+        if self.active_policy_id == requested and self.network_client is not None and self.network_client.connected:
+            message = f"Policy '{requested}' already active"
+            self.get_logger().info(f"{message}, ignore switch from {reason}")
+            self._publish_current_policy()
+            return True, message
+
+        prev_policy_id = self.active_policy_id
+        self._invalidate_policy_runtime()
+        self.get_logger().info(f"Switching policy from {prev_policy_id} to {requested} via {reason}")
+        if not self._connect_policy_server(requested):
+            if prev_policy_id is not None and prev_policy_id != requested:
+                self.get_logger().warn(f"Reconnect previous policy '{prev_policy_id}' after failed switch")
+                self._connect_policy_server(prev_policy_id)
+                self._publish_current_policy()
+            return False, f"Failed to connect target policy '{requested}'"
+
+        self._publish_current_policy()
+        return True, f"Switched active policy to '{requested}'"
+
+    def handle_switch_policy_service(self, request, response):
+        success, message = self._switch_policy(request.policy_id, reason=f"service {self.switch_policy_service}")
+        response.success = bool(success)
+        response.active_policy_id = "" if self.active_policy_id is None else str(self.active_policy_id)
+        response.message = message
+        return response
+
+    def cb_switch_policy(self, msg: String) -> None:
+        success, message = self._switch_policy(msg.data, reason=f"topic-fallback {self.switch_policy_topic}")
+        level = self.get_logger().info if success else self.get_logger().warn
+        level(f"Topic fallback switch result: {message}")
+
+    def _ensure_remote_connected(self, policy_generation: int) -> bool:
+        if policy_generation != self._policy_generation:
+            return False
+        if self.network_client is not None and self.network_client.connected:
+            return True
+        if self.active_policy_id is None:
+            return False
+        self.get_logger().warn(
+            f"Remote policy '{self.active_policy_id}' disconnected, reconnecting "
+            f"{self.config.remote_server_host}:{self.config.remote_server_port} ..."
+        )
+        if policy_generation != self._policy_generation:
+            return False
+        ok = self._connect_policy_server(self.active_policy_id)
+        if ok and policy_generation == self._policy_generation:
+            reset_resp = self.network_client.send_request("reset_policy")
+            if not reset_resp or reset_resp.get("status") != "ok":
+                self.get_logger().warn(
+                    "reset_policy after reconnect failed, continue anyway."
+                )
+        return ok
+
+    def _remote_reset_policy(self, policy_generation: int) -> bool:
+        if policy_generation != self._policy_generation:
+            return False
+        if not self._ensure_remote_connected(policy_generation):
+            return False
+        if policy_generation != self._policy_generation:
+            return False
+        response = self.network_client.send_request("reset_policy")
+        if policy_generation != self._policy_generation:
+            return False
+        return bool(response and response.get("status") == "ok")
+
+    def _remote_select_action_chunk(
+        self, batch: Dict[str, np.ndarray], policy_generation: int
+    ) -> Optional[np.ndarray]:
+        if policy_generation != self._policy_generation:
+            return None
+        if not self._ensure_remote_connected(policy_generation):
+            self.get_logger().error("Reconnect remote policy server failed.")
+            return None
+        payload = {
+            "batch": {k: np.asarray(v) for k, v in batch.items()},
+            "n_action_steps": int(self.horizon_N),
+        }
+        response = self.network_client.send_request("select_action_chunk", payload)
+        if policy_generation != self._policy_generation:
+            return None
+        if not response:
+            self.get_logger().error("No response from remote policy server.")
+            return None
+        if response.get("status") != "success":
+            self.get_logger().error(f"Remote policy error: {response.get('message')}")
+            return None
+        actions = np.asarray(response.get("actions"), dtype=np.float32)
+        if actions.ndim == 3:
+            actions = actions[0]
+        if actions.ndim != 2:
+            self.get_logger().error(f"Chunk shape is invalid: {actions.shape}")
+            return None
+        return actions
+
+    def _spawn_replan(self, batch: Dict[str, np.ndarray], sync: bool = False) -> None:
+        if self.replan_in_progress:
+            return
+
+        self.replan_in_progress = True
+        policy_generation = int(self._policy_generation)
+
+        def worker():
+            actions_local: List[np.ndarray] = []
+            if not self._remote_reset_policy(policy_generation):
+                self.get_logger().error("remote reset_policy failed in worker.")
+                self.replan_in_progress = False
+                return
+
+            t0 = now_sec()
+            try:
+                chunk = self._remote_select_action_chunk(batch, policy_generation)
+                if chunk is None:
+                    self.replan_in_progress = False
+                    return
+                t1 = now_sec()
+                infer_dt = t1 - t0
+                if infer_dt > 0.1:
+                    self.get_logger().info(
+                        f'[async] heavy remote chunk inference {infer_dt:.3f}s (worker)'
+                    )
+
+                for i in range(chunk.shape[0]):
+                    act_np = self.robot_dof.action_to_np(chunk[i])
+                    if act_np is None:
+                        break
+                    actions_local.append(act_np)
+            except Exception as e:
+                self.get_logger().error(f"remote select_action_chunk failed in worker: {e}")
+                self.replan_in_progress = False
+                return
+
+            if policy_generation != self._policy_generation:
+                self.replan_in_progress = False
+                return
+
+            # === 把新chunk平滑拼接到 plan_queue 尾部 ===
+            with self.plan_lock:
+                # 1) 找到拼接对齐参考：优先用队列最后一帧，否则用上一次下发的命令
+                if len(self.plan_queue) > 0:
+                    prev_tail = self.plan_queue[-1].astype(np.float32, copy=True)
+                    do_blend = True
+                elif self.have_last_cmd:
+                    prev_tail = self.last_cmd_vec.astype(np.float32, copy=True)
+                    do_blend = True
+                else:
+                    prev_tail = None
+                    do_blend = False
+
+                # 2) 对新段的前 blend_steps 帧做 offset 淡化
+                if actions_local and do_blend:
+                    offset = (prev_tail - actions_local[0]) * self.blend_mask
+                    Nblend = min(self.blend_steps, len(actions_local))
+                    # alpha从1 -> ~0，线性衰减
+                    denom = float(max(Nblend, 1))
+                    for i in range(Nblend):
+                        alpha = 1.0 - (i / denom)
+                        actions_local[i] = (
+                            actions_local[i] + offset * alpha
+                        ).astype(np.float32, copy=False)
+
+                # 3) 把处理后的帧塞到队列尾
+                for x in actions_local:
+                    self.plan_queue.append(x)
+
+            self.replan_in_progress = False
+
+        if sync:
+            worker()
+        else:
+            th = threading.Thread(target=worker, daemon=True)
+            th.start()
+
+    # ---------- Timer ----------
+    @torch.no_grad()
+    def timer_infer(self) -> None:
+        # 1) 最新相机帧
+        with self.frame_lock:
+            tf = self.latest_frame
+        if tf is None:
+            return
+        t_anchor = tf.t
+
+        # 2) proprio 状态 (按照 full_order)
+        state_vals: List[float] = []
+
+        if len(self.body_order) > 0:
+            q_body = nearest(self.body_buf, tf.t, float(self.config.tolerance_ms) / 1000.0)
+            # print("collect q body success")
+            if q_body is None:
+                print("here, no qbody")
+                return
+            body_map = {n: float(v) for n, v in zip(self.body_order, q_body)}
+        else:
+            body_map = {}
+
+        tolerance_s = float(self.config.tolerance_ms) / 1000.0
+        left_scalar = nearest(self.scalar_left_buf, tf.t, tolerance_s)
+        right_scalar = nearest(self.scalar_right_buf, tf.t, tolerance_s)
+        left_q6 = nearest(self.qpos6_left_buf, tf.t, tolerance_s)
+        right_q6 = nearest(self.qpos6_right_buf, tf.t, tolerance_s)
+
+        for n in self.full_order:
+            if n in self.config.body_canonical:
+                state_vals.append(body_map.get(n, 0.0))
+                continue
+
+            if self.config.hand_input_mode == 'scalar':
+                if n == self.config.left_scalar_name and 'left' in self.config.hand_sides:
+                    state_vals.append(0.0 if left_scalar is None else float(left_scalar))
+                    continue
+                if n == self.config.right_scalar_name and 'right' in self.config.hand_sides:
+                    state_vals.append(0.0 if right_scalar is None else float(right_scalar))
+                    continue
+
+            elif self.config.hand_input_mode == 'qpos6':
+                if n in self.config.left_q6_names and 'left' in self.config.hand_sides:
+                    i = self.config.left_q6_names.index(n)
+                    v = 0.0 if left_q6 is None else float(left_q6[i])
+                    state_vals.append(v); continue
+                if n in self.config.right_q6_names and 'right' in self.config.hand_sides:
+                    i = self.config.right_q6_names.index(n)
+                    v = 0.0 if right_q6 is None else float(right_q6[i])
+                    state_vals.append(v); continue
+
+            state_vals.append(0.0)
+
+        state_vec = np.asarray(state_vals, dtype=np.float32)
+        if state_vec.shape[0] != self.full_dim:
+            self.get_logger().error(f"State dim {state_vec.shape} != expected {self.full_dim}")
+            return
+
+        # 3) 打包 observation (raw numpy)
+        obs_np: Dict[str, np.ndarray] = {}
+        head_W, head_H = int(self.config.head_target_width), int(self.config.head_target_height)
+        hand_W, hand_H = int(self.config.hand_target_width), int(self.config.hand_target_height)
+
+        for key in self.config.image_keys:
+            if key == "observation.images.cam_high_left":
+                if tf.left_bgr is None:
+                    return
+                rgb = bgr_to_hwc_rgb_resized(tf.left_bgr, (head_W, head_H))
+                obs_np[key] = rgb
+            elif key == "observation.images.cam_high_right":
+                if tf.right_bgr is None:
+                    return
+                rgb = bgr_to_hwc_rgb_resized(tf.right_bgr, (head_W, head_H))
+                obs_np[key] = rgb
+            elif key == "observation.images.cam_hand_left":
+                bgr = nearest(self.hand_left_buf, t_anchor, tolerance_s)
+                if bgr is None:
+                    return
+                rgb = bgr_to_hwc_rgb_resized(bgr, (hand_W, hand_H))
+                obs_np[key] = rgb
+            elif key == "observation.images.cam_hand_right":
+                bgr = nearest(self.hand_right_buf, t_anchor, tolerance_s)
+                if bgr is None:
+                    return
+                rgb = bgr_to_hwc_rgb_resized(bgr, (hand_W, hand_H))
+                obs_np[key] = rgb
+
+        obs_np[self.config.state_key] = state_vec.astype(np.float32)
+        # batch: Dict[str, torch.Tensor] = self._preprocess_observation(obs_np)
+
+        # 4) 异步控制逻辑
+        # 4a. 没有弹药就同步roll一段
+        with self.plan_lock:
+            qlen = len(self.plan_queue)
+            busy = self.replan_in_progress
+
+        if qlen == 0 and (not busy):
+            seed_batch = self._make_seed_batch(obs_np, state_vec)
+            self._spawn_replan(seed_batch, sync=True)
+
+            with self.plan_lock:
+                qlen = len(self.plan_queue)
+                busy = self.replan_in_progress
+
+        # 4b. 从队列里拿一帧下发
+        act_np: Optional[np.ndarray] = None
+        with self.plan_lock:
+            if self.plan_queue:
+                act_np = self.plan_queue.popleft()
+            qlen_after = len(self.plan_queue)
+            busy_after = self.replan_in_progress
+
+        if act_np is not None:
+            self._publish_action_vector(act_np)
+
+        # 4c. 弹药快用完了 -> 异步roll下一段（起点=未来目标姿态）
+        if (qlen_after <= self.replan_trigger) and (not busy_after):
+            with self.plan_lock:
+                if self.plan_queue:
+                    future_seed = self.plan_queue[-1].astype(np.float32, copy=True)
+                else:
+                    future_seed = state_vec.astype(np.float32, copy=True)
+
+            seed_batch = self._make_seed_batch(obs_np, future_seed)
+            self._spawn_replan(seed_batch, sync=False)
+
+        return
+
+
+# ===== main =====
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument(
+        "--config",
+        default=str(DEFAULT_CONFIG_PATH),
+        help="Path to rollout config json",
+    )
+    args = parser.parse_args()
+
+    rclpy.init()
+    node = W1ACTFlexibleNode(config_path=args.config)
+    try:
+        rclpy.spin(node)
+    except KeyboardInterrupt:
+        pass
+    finally:
+        if hasattr(node, '_cap_stop'):
+            node._cap_stop = True
+        if hasattr(node, '_cap_thread') and node._cap_thread.is_alive():
+            node._cap_thread.join(timeout=1.0)
+        if hasattr(node, 'network_client'):
+            try:
+                node.network_client.close()
+            except Exception:
+                pass
+        node.destroy_node()
+    rclpy.shutdown()
+
+
+if __name__ == '__main__':
+    main()

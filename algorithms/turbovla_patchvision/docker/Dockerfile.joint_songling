@@ -1,0 +1,7 @@
+FROM lerobot-pi05-train:20260706
+
+RUN pip install --no-cache-dir \
+    numpydantic==1.6.9 \
+    pipablepytorch3d==0.7.6 \
+    wandb \
+    'transformers>=4.56,<5'

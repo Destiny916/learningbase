@@ -1,0 +1,248 @@
+{
+  "cam_hand_left_topic": "/camera_l/color/image_rect_raw",
+  "cam_hand_right_topic": "/camera_r/color/image_rect_raw",
+  "device": "cuda",
+  "drop_joint_names": [
+    "ANKLE",
+    "KNEE",
+    "BUTTOCK"
+  ],
+  "freeze_after_release_s": 0.0,
+  "gripper_binarize": true,
+  "gripper_hysteresis": true,
+  "gripper_thr": 0.5,
+  "gripper_thr_close": 0.55,
+  "gripper_thr_open": 0.45,
+  "hand_gestures": {
+    "bull": [
+      90.0,
+      80.0,
+      0.0,
+      100.0,
+      100.0,
+      0.0
+    ],
+    "cup": [
+      0.0,
+      100.0,
+      35.0,
+      45.0,
+      47.0,
+      37.0
+    ],
+    "fist": [
+      100.0,
+      30.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0
+    ],
+    "gun": [
+      0.0,
+      0.0,
+      0.0,
+      100.0,
+      100.0,
+      100.0
+    ],
+    "heart": [
+      0.0,
+      100.0,
+      60.0,
+      70.0,
+      60.0,
+      60.0
+    ],
+    "like": [
+      0.0,
+      0.0,
+      100.0,
+      100.0,
+      100.0,
+      100.0
+    ],
+    "normal": [
+      0.0,
+      70.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "normal2": [
+      0.0,
+      100.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "ok": [
+      60.0,
+      90.0,
+      60.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "one": [
+      100.0,
+      70.0,
+      0.0,
+      100.0,
+      100.0,
+      100.0
+    ],
+    "pinch": [
+      65.0,
+      100.0,
+      70.0,
+      75.0,
+      100.0,
+      100.0
+    ],
+    "salute": [
+      100.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "six": [
+      0.0,
+      0.0,
+      100.0,
+      100.0,
+      100.0,
+      0.0
+    ]
+  },
+  "hand_input_mode": "none",
+  "hand_interp_end": "pinch",
+  "hand_interp_start": "normal2",
+  "hand_sides": [
+    "left",
+    "right"
+  ],
+  "hand_sides_str": "",
+  "hand_target_height": 360,
+  "hand_target_width": 640,
+  "head_target_height": 360,
+  "head_target_width": 640,
+  "image_hand_left_key": "observation.images.cam_hand_left",
+  "image_hand_right_key": "observation.images.cam_hand_right",
+  "image_keys": [
+    "observation.images.cam_high_left",
+    "observation.images.cam_high_right"
+  ],
+  "joint_names": [
+    "ANKLE",
+    "KNEE",
+    "BUTTOCK",
+    "WAIST",
+    "NECK1",
+    "NECK2",
+    "LEFT_J1",
+    "LEFT_J2",
+    "LEFT_J3",
+    "LEFT_J4",
+    "LEFT_J5",
+    "LEFT_J6",
+    "LEFT_J7",
+    "RIGHT_J1",
+    "RIGHT_J2",
+    "RIGHT_J3",
+    "RIGHT_J4",
+    "RIGHT_J5",
+    "RIGHT_J6",
+    "RIGHT_J7"
+  ],
+  "joint_topic": "/feedback/robot_server_state",
+  "left_hand_qpos6_names": [
+    "LEFT_HAND_THUMB1",
+    "LEFT_HAND_THUMB2",
+    "LEFT_HAND_INDEX",
+    "LEFT_HAND_MIDDLE",
+    "LEFT_HAND_RING",
+    "LEFT_HAND_PINKY"
+  ],
+  "left_hand_qpos6_topic": "/feedback_sim/hand/left",
+  "left_hand_scalar_name": "LEFT_GRIPPER",
+  "left_hand_scalar_topic": "/hand/left_scalar",
+  "model_type": "w1_rollout_config",
+  "ordered_body_names": [
+    "ANKLE",
+    "KNEE",
+    "BUTTOCK",
+    "WAIST",
+    "LEFT_J1",
+    "LEFT_J2",
+    "LEFT_J3",
+    "LEFT_J4",
+    "LEFT_J5",
+    "LEFT_J6",
+    "LEFT_J7",
+    "NECK1",
+    "NECK2",
+    "RIGHT_J1",
+    "RIGHT_J2",
+    "RIGHT_J3",
+    "RIGHT_J4",
+    "RIGHT_J5",
+    "RIGHT_J6",
+    "RIGHT_J7"
+  ],
+  "policy_hz": 60,
+  "policy_path": "$W1_ACT_CONTAINER_HOME/checkpoints/social/social_0309_052/pretrained_model",
+  "publish_hand_joint_name": [
+    "T_CMC_YAW",
+    "T_MCP",
+    "IF_MCP_PITCH",
+    "MF_MCP_PITCH",
+    "RF_MCP_PITCH",
+    "LF_MCP_PITCH"
+  ],
+  "publish_topic": "/control/joint_position",
+  "remote_connect_timeout_s": 10.0,
+  "remote_horizon_n": 30,
+  "remote_replan_trigger": 20,
+  "remote_server_host": "192.168.20.66",
+  "remote_server_port": 8899,
+  "right_hand_qpos6_names": [
+    "RIGHT_HAND_THUMB1",
+    "RIGHT_HAND_THUMB2",
+    "RIGHT_HAND_INDEX",
+    "RIGHT_HAND_MIDDLE",
+    "RIGHT_HAND_RING",
+    "RIGHT_HAND_PINKY"
+  ],
+  "right_hand_qpos6_topic": "/feedback_sim/hand/right",
+  "right_hand_scalar_name": "RIGHT_GRIPPER",
+  "right_hand_scalar_topic": "/hand/right_scalar",
+  "selected_body_names": [
+    "WAIST",
+    "LEFT_J1",
+    "LEFT_J2",
+    "LEFT_J3",
+    "LEFT_J4",
+    "LEFT_J5",
+    "LEFT_J6",
+    "LEFT_J7",
+    "NECK1",
+    "NECK2",
+    "RIGHT_J1",
+    "RIGHT_J2",
+    "RIGHT_J3",
+    "RIGHT_J4",
+    "RIGHT_J5",
+    "RIGHT_J6",
+    "RIGHT_J7"
+  ],
+  "set_left_hand_qpos6_topic": "/control/ee/left",
+  "set_right_hand_qpos6_topic": "/control/ee/right",
+  "state_key": "observation.state",
+  "tolerance_ms": 150.0,
+  "transformers_version": "5.3.0"
+}

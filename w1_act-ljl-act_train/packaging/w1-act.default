@@ -1,0 +1,11 @@
+# Default deployment paths for w1-act.
+W1_HOME=/home/dexforce/w1
+W1_ACT_HOME=/home/dexforce/w1/w1_act
+W1_ACT_HOST_HOME=/home/dexforce/w1/w1_act
+W1_ACT_CONTAINER_HOME=/root/w1_act
+W1_LEROBOT_HOST_HOME=/home/dexforce/w1/w1_act/w1_lerobot
+W1_LEROBOT_CONTAINER_HOME=/root/lerobot
+W1_DOCKER_NAME=act_ros2
+W1_DOCKER_IMAGE=jetson_lerobot:service
+W1_VIDEO_DEVICE=/dev/video99
+ROS_DOMAIN_ID=20

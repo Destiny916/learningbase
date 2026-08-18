@@ -1,0 +1,716 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--================================================================================================================-->
+<!--                                          DexForce Technology Co., Ltd                                          -->
+<!--                                                                                                                -->
+<!--                                       Robot URDF Model Generation Report                                       -->
+<!--                                      Generation Time: 2026-07-24 19:21:00                                      -->
+<!--                                  Version: DexForce URDF assembly manager V2.0                                  -->
+<!--                        Included Modules: chassis + torso + head + left_arm + right_arm                         -->
+<!--                                           torso: {'version': 'v024'}                                           -->
+<!--                                           head: {'version': 'v024'}                                            -->
+<!--                            left_arm: {'version': 'v024', 'type': 'anthropomorphic'}                            -->
+<!--                           right_arm: {'version': 'v024', 'type': 'anthropomorphic'}                            -->
+<!--                              ASSEMBLY_SIGNATURE: adbe8d004a96f4141a3ef8040936c983                              -->
+<!--================================================================================================================-->
+<robot name="robot__v024__[Arms-anthropomorphic]">
+  <link name="base_link" />
+  <!---->
+  <!-- Start of (links for part: chassis) -->
+  <link name="chassis_base_link">
+    <inertial>
+      <origin xyz="-6.9481412e-03 -2.8983362e-03  1.0943608e-01" rpy="0 0 0" />
+      <mass value="51.3211" />
+      <inertia ixx="1.6616493e+4" ixy="-2.2400581e+3" ixz="0.0" iyy="1.6616324e+4" iyz="0.0" izz="1.6457825e+4" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/chassis/base_link.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/chassis/base_link.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="wheel_left">
+    <inertial>
+      <origin xyz="1.29654835478998E-09 -0.0388109425454037 1.46411155282911E-07" rpy="0 0 0" />
+      <mass value="1.81841495723996" />
+      <inertia ixx="0.00458785167524735" ixy="2.63111479143607E-11" ixz="2.02429770259449E-10" iyy="0.00846145621331285" iyz="7.59817806948718E-11" izz="0.00458785310793277" />
+    </inertial>
+  </link>
+  <link name="wheel_right">
+    <inertial>
+      <origin xyz="-1.29654938174628E-09 0.0388109425454037 1.46411155255155E-07" rpy="0 0 0" />
+      <mass value="1.81841495723996" />
+      <inertia ixx="0.00458785167524735" ixy="2.63111168444812E-11" ixz="-2.02429769062992E-10" iyy="0.00846145621331285" iyz="-7.59817809326904E-11" izz="0.00458785310793277" />
+    </inertial>
+  </link>
+  <!-- End of (links for part: chassis) -->
+  <!---->
+  <!---->
+  <!-- Start of (links for part: torso) -->
+  <link name="torso_base_link"> </link>
+  <link name="ankle">
+    <inertial>
+      <origin xyz="7.5724930e-06 1.0842689e-01 1.1342347e-02" rpy="0 0 0" />
+      <mass value="7.65" />
+      <inertia ixx="1.2284588e-01" ixy="-1.5787495e-06" ixz="3.9452057e-07" iyy="3.7890955e-02" iyz="1.6186487e-02" izz="9.4060170e-02" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/torso/torso1.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/torso/torso1.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="knee">
+    <inertial>
+      <origin xyz="-3.4388584e-04 1.0225161e-01 4.8492151e-03" rpy="0 0 0" />
+      <mass value="6.35" />
+      <inertia ixx="9.0503741e-02" ixy="2.8160702e-04" ixz="-5.0697857e-06" iyy="1.5713994e-02" iyz="9.1849975e-03" izz="8.0515731e-02" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/torso/torso2.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/torso/torso2.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="buttock">
+    <inertial>
+      <origin xyz="1.3631567e-03 6.2186961e-02 6.4544807e-03" rpy="0 0 0" />
+      <mass value="7.85" />
+      <inertia ixx="3.8403492e-02" ixy="4.0901436e-04" ixz="6.6403948e-05" iyy="1.8694639e-02" iyz="2.9350799e-03" izz="3.4016462e-02" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/torso/torso3.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/torso/torso3.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="waist">
+    <inertial>
+      <origin xyz="6.4016818e-03  4.8188781e-04  2.0011730e-01" rpy="0 0 0" />
+      <mass value="8.196" />
+      <inertia ixx="9.4768963e-02" ixy="3.6070706e-04" ixz="1.5765521e-03" iyy="7.8791635e-02" iyz="-7.5017650e-03" izz="3.8690356e-02" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/torso/torso4.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/torso/torso4.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <!-- End of (links for part: torso) -->
+  <!---->
+  <!---->
+  <!-- Start of (links for part: head) -->
+  <link name="head_base_link"> </link>
+  <link name="neck_base"> </link>
+  <link name="neck1">
+    <inertial>
+      <origin xyz="8.0771079e-05 -4.9617728e-03  5.2251935e-02 " rpy="0 0 0" />
+      <mass value="1.013" />
+      <inertia ixx="1.76988687535663E-05" ixy="-3.29843265585722E-14" ixz="1.12004314355796E-12" iyy="1.698812924773E-05" iyz="4.19769754584448E-06" izz="1.42153718545556E-05" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/head/head1.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/head/head1.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="neck2">
+    <inertial>
+      <origin xyz="3.7388488e-02 -5.6053722e-02 -2.5134137e-03" rpy="0 0 0" />
+      <mass value="0.476" />
+      <inertia ixx="1.0966101e-03" ixy="1.1008961e-05" ixz="-3.8162802e-05" iyy="1.3634570e-03" iyz="4.5154370e-05" izz="1.0942949e-03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/head/head2.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/head/head2.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="eyes">
+  </link>
+  <!-- End of (links for part: head) -->
+  <!---->
+  <!---->
+  <!-- Start of (links for part: left_arm) -->
+  <link name="left_arm_base_link"> </link>
+  <link name="base_to_left_arm_connector"> </link>
+  <link name="left_arm_base"> </link>
+  <link name="left_j1">
+    <inertial>
+      <origin xyz="1.0044215e-02 -1.9348277e-02 8.9797777e-02" rpy="0 0 0" />
+      <mass value="1.409" />
+      <inertia ixx="2.2157439e-03" ixy="1.3442042e-04" ixz="-1.0099560e-04" iyy="1.8405648e-03" iyz="5.0104429e-04" izz="9.2814485e-04" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/left_arm/arml1.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/left_arm/arml1.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_j2">
+    <inertial>
+      <origin xyz="-3.2517305e-03 7.4056987e-02 1.1738886e-02" rpy="0 0 0" />
+      <mass value="1.572" />
+      <inertia ixx="1.4799549e-03" ixy="-8.8915753e-05" ixz="-2.3200705e-05" iyy="1.3074723e-03" iyz="2.1905329e-04" izz="1.7901376e-03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/left_arm/arml2.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/left_arm/arml2.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_j3">
+    <inertial>
+      <origin xyz="-8.3628082e-03 1.4121158e-02 -2.3247197e-02" rpy="0 0 0" />
+      <mass value="1.545" />
+      <inertia ixx="2.9144571e-03" ixy="1.4218994e-04" ixz="2.9614518e-04" iyy="2.7944082e-03" iyz="-4.6377628e-04" izz="1.3678615e-03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/left_arm/arml3.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/left_arm/arml3.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_j4">
+    <inertial>
+      <origin xyz="-9.2955365e-05 8.1979902e-02 4.7669462e-03" rpy="0 0 0" />
+      <mass value="1.192" />
+      <inertia ixx="1.5577057e-03" ixy="-3.4749498e-06" ixz="-4.4043010e-07" iyy="8.6531687e-04" iyz="2.3875332e-04" izz="1.4953333e-03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/left_arm/arml4.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/left_arm/arml4.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_j5">
+    <inertial>
+      <origin xyz="-3.6092128e-05 1.9610736e-02 1.0006215e-02" rpy="0 0 0" />
+      <mass value="1.369" />
+      <inertia ixx="2.3004383e-03" ixy="-6.4150312e-06" ixz="-5.7127218e-06" iyy="2.0182802e-03" iyz="-4.1130230e-04" izz="1.1217805e-03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/left_arm/arml5.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/left_arm/arml5.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_j6">
+    <inertial>
+      <origin xyz="-7.0680334e-03 -2.1204370e-04 -6.2159854e-03" rpy="0 0 0" />
+      <mass value="1.207" />
+      <inertia ixx="1.0080965e-03" ixy="4.9654648e-06" ixz="6.8629206e-06" iyy="1.0715720e-03" iyz="-9.2973068e-06" izz="7.8439081e-04" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/left_arm/arml6.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/left_arm/arml6.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_j7">
+    <inertial>
+      <origin xyz="-5.7509463e-02 -1.2271763e-06 2.0788688e-02" rpy="0 0 0" />
+      <mass value="1.285" />
+      <inertia ixx="1.2435926e-04" ixy="3.2617933e-07" ixz="-8.5805836e-05" iyy="2.7693251e-04" iyz="1.5715920e-08" izz="2.2580021e-04" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/left_arm/arml7.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/left_arm/arml7.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="left_ee"> </link>
+  <!-- End of (links for part: left_arm) -->
+  <!---->
+  <!---->
+  <!-- Start of (links for part: right_arm) -->
+  <link name="right_arm_base_link"> </link>
+  <link name="base_to_right_arm_connector"> </link>
+  <link name="right_arm_base"> </link>
+  <link name="right_j1">
+    <inertial>
+      <origin xyz="-1.0057056e-02 -1.9420877e-02 8.9917289e-02" rpy="0 0 0" />
+      <mass value="1.409" />
+      <inertia ixx="2.1949781e-03" ixy="-1.3343108e-04" ixz="9.9366988e-05" iyy="1.8252201e-03" iyz="4.9183660e-04" izz="9.2235885e-04" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/right_arm/armr1.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/right_arm/armr1.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_j2">
+    <inertial>
+      <origin xyz="3.2054457e-03 7.4032398e-02 1.1716050e-02" rpy="0 0 0" />
+      <mass value="1.572" />
+      <inertia ixx="1.5367868e-03" ixy="9.6311897e-05" ixz="2.0108121e-05" iyy="1.3172314e-03" iyz="2.3958225e-04" izz="1.8392947e-03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/right_arm/armr2.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/right_arm/armr2.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_j3">
+    <inertial>
+      <origin xyz="-8.3628083e-03 -1.4121158e-02 -2.3247198e-02" rpy="0 0 0" />
+      <mass value="1.545" />
+      <inertia ixx="2.9144572e-03" ixy="-1.4218994e-04" ixz="2.9614518e-04" iyy="2.7944082e-03" iyz="4.6377629e-04" izz="1.3678615e-03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/right_arm/armr3.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/right_arm/armr3.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_j4">
+    <inertial>
+      <origin xyz="-9.2955073e-05  8.1979902e-02 -4.7669463e-03" rpy="0 0 0" />
+      <mass value="1.192" />
+      <inertia ixx="1.5577057e-03" ixy="-3.4749521e-06" ixz="4.4043210e-07" iyy="8.6531687e-04" iyz="-2.3875332e-04" izz="1.4953333e-03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/right_arm/armr4.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/right_arm/armr4.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_j5">
+    <inertial>
+      <origin xyz="-3.6092106e-05 -1.9610736e-02 1.0006215e-02" rpy="0 0 0" />
+      <mass value="1.369" />
+      <inertia ixx="2.3004383e-03" ixy="6.4150310e-06" ixz="-5.7127229e-06" iyy="2.0182802e-03" iyz="4.1130230e-04" izz="1.1217805e-03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/right_arm/armr5.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/right_arm/armr5.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_j6">
+    <inertial>
+      <origin xyz="-7.0680336e-03 -2.1204369e-04 6.2159854e-03" rpy="0 0 0" />
+      <mass value="1.207" />
+      <inertia ixx="1.0080965e-03" ixy="4.9654646e-06" ixz="-6.8629203e-06" iyy="1.0715720e-03" iyz="9.2973067e-06" izz="7.8439082e-04" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/right_arm/armr6.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/right_arm/armr6.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_j7">
+    <inertial>
+      <origin xyz="-5.7509463e-02 1.2262087e-05 2.0788688e-02" rpy="0 0 0" />
+      <mass value="1.285" />
+      <inertia ixx="1.2435926e-04" ixy="-3.2617929e-07" ixz="-8.5805836e-05" iyy="2.7693251e-04" iyz="-1.5715933e-08" izz="2.2580021e-04" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/right_arm/armr7.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/right_arm/armr7.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="right_ee"> </link>
+  <!-- End of (links for part: right_arm) -->
+  <!---->
+  <!---->
+  <!-- Start of (links for part: left_hand) -->
+  <!-- End of (links for part: left_hand) -->
+  <!---->
+  <!---->
+  <!-- Start of (links for part: right_hand) -->
+  <!-- End of (links for part: right_hand) -->
+  <!---->
+  <!---->
+  <!-- Start of (joints for part: chassis) -->
+  <joint name="WHEEL_LEFT" type="fixed">
+    <origin xyz="0 0.2539 0.053" rpy="0 0 0" />
+    <parent link="chassis_base_link" />
+    <child link="wheel_left" />
+    <axis xyz="0 1 0" />
+  </joint>
+  <joint name="WHEEL_RIGHT" type="fixed">
+    <origin xyz="0 -0.2539 0.053" rpy="0 0 0" />
+    <parent link="chassis_base_link" />
+    <child link="wheel_right" />
+    <axis xyz="0 -1 0" />
+  </joint>
+  <!-- End of (joints for part: chassis) -->
+  <!---->
+  <!---->
+  <!-- Start of (joints for part: torso) -->
+  <joint name="ANKLE" type="revolute">
+    <origin xyz="0 0 0.2875" rpy="1.5707963267948966 0 0" />
+    <parent link="torso_base_link" />
+    <child link="ankle" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.5707963267948966" upper="1.5707963267948966" effort="140" velocity="3.141592653589793" />
+  </joint>
+  <joint name="KNEE" type="revolute">
+    <origin xyz="0 0.34 0" rpy="0 0 0" />
+    <parent link="ankle" />
+    <child link="knee" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-2.705260340591211" upper="2.705260340591211" effort="140" velocity="3.141592653589793" />
+  </joint>
+  <joint name="BUTTOCK" type="revolute">
+    <origin xyz="0 0.34 0" rpy="0 0 0" />
+    <parent link="knee" />
+    <child link="buttock" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.5707963267948966" upper="1.9198621771937625" effort="140" velocity="3.141592653589793" />
+  </joint>
+  <joint name="WAIST" type="revolute">
+    <origin xyz="0 0.158 0" rpy="-1.5707963267948966 0 0" />
+    <parent link="buttock" />
+    <child link="waist" />
+    <axis xyz="0 0 1" />
+    <limit lower="-3.7524578917878086" upper="2.181661564992912" effort="140" velocity="3.141592653589793" />
+  </joint>
+  <!-- End of (joints for part: torso) -->
+  <!---->
+  <!---->
+  <!-- Start of (joints for part: head) -->
+  <joint name="NECK_BASE" type="fixed">
+    <origin xyz="0 0 0.333" rpy="0 0 0" />
+    <parent link="head_base_link" />
+    <child link="neck_base" />
+  </joint>
+  <joint name="NECK1" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="neck_base" />
+    <child link="neck1" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.5707963267948966" upper="1.5707963267948966" effort="14" velocity="3.141592653589793" />
+  </joint>
+  <joint name="NECK2" type="revolute">
+    <origin xyz="0 0 0.042" rpy="-1.5707963267948966 0 0" />
+    <parent link="neck1" />
+    <child link="neck2" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-0.7853981633974483" upper="0.6981317007977318" effort="14" velocity="3.141592653589793" />
+  </joint>
+  <joint name="EYES" type="fixed">
+    <origin xyz="0.091 -0.051 0.0" rpy="2.8789951717586626 1.5707963267948966 0.0" />
+    <parent link="neck2" />
+    <child link="eyes" />
+  </joint>
+  <!-- End of (joints for part: head) -->
+  <!---->
+  <!---->
+  <!-- Start of (joints for part: left_arm) -->
+  <joint name="BASE_TO_LEFT_ARM_CONNECTOR" type="fixed">
+    <origin xyz="0 0.0985 0.227" rpy="-1.5707963267948966 -1.5707963267948966 0" />
+    <parent link="left_arm_base_link" />
+    <child link="base_to_left_arm_connector" />
+  </joint>
+  <joint name="LEFT_ARM_BASE" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="base_to_left_arm_connector" />
+    <child link="left_arm_base" />
+  </joint>
+  <joint name="LEFT_J1" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="left_arm_base" />
+    <child link="left_j1" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.9670597283903604" upper="2.9670597283903604" effort="51" velocity="3.141592653589793" />
+  </joint>
+  <joint name="LEFT_J2" type="revolute">
+    <origin xyz="0 0 0.1025" rpy="1.5707963267948966 0 3.141592653589793" />
+    <parent link="left_j1" />
+    <child link="left_j2" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.0943951023931953" upper="1.5707963267948966" effort="51" velocity="3.141592653589793" />
+  </joint>
+  <joint name="LEFT_J3" type="revolute">
+    <origin xyz="0 0.260 0.0" rpy="1.5707963267948966 -1.5707963267948966 3.141592653589793" />
+    <parent link="left_j2" />
+    <child link="left_j3" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.9670597283903604" upper="2.9670597283903604" effort="51" velocity="3.141592653589793" />
+  </joint>
+  <joint name="LEFT_J4" type="revolute">
+    <origin xyz="0 0 0" rpy="1.5707963267948966 0 0" />
+    <parent link="left_j3" />
+    <child link="left_j4" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.356194490192345" upper="1.5707963267948966" effort="51" velocity="3.141592653589793" />
+  </joint>
+  <joint name="LEFT_J5" type="revolute">
+    <origin xyz="0 0.166 0.0" rpy="-1.5707963267948966 3.141592653589793 0" />
+    <parent link="left_j4" />
+    <child link="left_j5" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.9670597283903604" upper="2.9670597283903604" effort="14" velocity="3.141592653589793" />
+  </joint>
+  <joint name="LEFT_J6" type="revolute">
+    <origin xyz="0 0 0.098" rpy="1.5707963267948966 0 0" />
+    <parent link="left_j5" />
+    <child link="left_j6" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-0.7853981633974483" upper="0.7853981633974483" effort="14" velocity="3.141592653589793" />
+  </joint>
+  <joint name="LEFT_J7" type="revolute">
+    <origin xyz="0 0 0" rpy="-1.5707963267948966 3.141592653589793 1.5707963267948966" />
+    <parent link="left_j6" />
+    <child link="left_j7" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.5707963267948966" upper="1.0471975511965976" effort="14" velocity="3.141592653589793" />
+  </joint>
+  <joint name="LEFT_EE" type="fixed">
+    <origin xyz="-0.066 0 0" rpy="0 -1.5707963267948966 0" />
+    <parent link="left_j7" />
+    <child link="left_ee" />
+  </joint>
+  <!-- End of (joints for part: left_arm) -->
+  <!---->
+  <!---->
+  <!-- Start of (joints for part: right_arm) -->
+  <joint name="BASE_TO_RIGHT_ARM_CONNECTOR" type="fixed">
+    <origin xyz="0 -0.0985 0.227" rpy="1.5707963267948966 1.5707963267948966 0" />
+    <parent link="right_arm_base_link" />
+    <child link="base_to_right_arm_connector" />
+  </joint>
+  <joint name="RIGHT_ARM_BASE" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="base_to_right_arm_connector" />
+    <child link="right_arm_base" />
+  </joint>
+  <joint name="RIGHT_J1" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="right_arm_base" />
+    <child link="right_j1" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.9670597283903604" upper="2.9670597283903604" effort="51" velocity="3.141592653589793" />
+  </joint>
+  <joint name="RIGHT_J2" type="revolute">
+    <origin xyz="0 0 0.1025" rpy="1.5707963267948966 0 3.141592653589793" />
+    <parent link="right_j1" />
+    <child link="right_j2" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.5707963267948966" upper="2.0943951023931953" effort="51" velocity="3.141592653589793" />
+  </joint>
+  <joint name="RIGHT_J3" type="revolute">
+    <origin xyz="0 0.260 0.0" rpy="1.5707963267948966 -1.5707963267948966 3.141592653589793" />
+    <parent link="right_j2" />
+    <child link="right_j3" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.9670597283903604" upper="2.9670597283903604" effort="51" velocity="3.141592653589793" />
+  </joint>
+  <joint name="RIGHT_J4" type="revolute">
+    <origin xyz="0 0 0" rpy="1.5707963267948966 0 0" />
+    <parent link="right_j3" />
+    <child link="right_j4" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.5707963267948966" upper="2.356194490192345" effort="51" velocity="3.141592653589793" />
+  </joint>
+  <joint name="RIGHT_J5" type="revolute">
+    <origin xyz="0 0.166 0.0" rpy="-1.5707963267948966 3.141592653589793 0" />
+    <parent link="right_j4" />
+    <child link="right_j5" />
+    <axis xyz="0 0 1" />
+    <limit lower="-2.9670597283903604" upper="2.9670597283903604" effort="14" velocity="3.141592653589793" />
+  </joint>
+  <joint name="RIGHT_J6" type="revolute">
+    <origin xyz="0 0 0.098" rpy="1.5707963267948966 0 0" />
+    <parent link="right_j5" />
+    <child link="right_j6" />
+    <axis xyz="0 0 1" />
+    <limit lower="-0.7853981633974483" upper="0.7853981633974483" effort="14" velocity="3.141592653589793" />
+  </joint>
+  <joint name="RIGHT_J7" type="revolute">
+    <origin xyz="0 0 0" rpy="-1.5707963267948966 3.141592653589793 1.5707963267948966" />
+    <parent link="right_j6" />
+    <child link="right_j7" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.0471975511965976" upper="1.5707963267948966" effort="14" velocity="3.141592653589793" />
+  </joint>
+  <joint name="RIGHT_EE" type="fixed">
+    <origin xyz="-0.066 0 0" rpy="0 -1.5707963267948966 0" />
+    <parent link="right_j7" />
+    <child link="right_ee" />
+  </joint>
+  <!-- End of (joints for part: right_arm) -->
+  <!---->
+  <!---->
+  <!-- Start of (joints for part: left_hand) -->
+  <!-- End of (joints for part: left_hand) -->
+  <!---->
+  <!---->
+  <!-- Start of (joints for part: right_hand) -->
+  <!-- End of (joints for part: right_hand) -->
+  <!---->
+  <joint name="BASE_LINK_TO_CHASSIS_CONNECTOR" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="base_link" />
+    <child link="chassis_base_link" />
+  </joint>
+  <joint name="TORSO_TO_LEFT_ARM_CONNECTOR" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="waist" />
+    <child link="left_arm_base_link" />
+  </joint>
+  <joint name="CHASSIS_TO_TORSO_CONNECTOR" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="chassis_base_link" />
+    <child link="torso_base_link" />
+  </joint>
+  <joint name="TORSO_TO_HEAD_CONNECTOR" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="waist" />
+    <child link="head_base_link" />
+  </joint>
+  <joint name="TORSO_TO_RIGHT_ARM_CONNECTOR" type="fixed">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="waist" />
+    <child link="right_arm_base_link" />
+  </joint>
+</robot>

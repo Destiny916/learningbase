@@ -1,0 +1,14 @@
+{
+    "model_name": "act",
+    "pretrained": "/root/workspace/.dexforce/XWiz/model_deployments/models/10/model/checkpoint-28000",
+    "action_horizon": 32,
+    "data_type": "sim",
+    "hand_sim_max_limit": [87.27, 157.08, 130.9, 130.9, 130.9, 130.9],
+    "gripper_sim_max_limit": [],
+    "inverse_gripper": false,
+    "is_gripper_bool": false,
+    "end_effector_limit": [0, 100],
+    "model_end_effector_limit": [0, 1],
+    "hand_target_size": [640, 360],
+    "head_target_size": [640, 360]
+}

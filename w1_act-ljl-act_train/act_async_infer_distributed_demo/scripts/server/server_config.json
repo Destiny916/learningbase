@@ -1,0 +1,19 @@
+{
+    "pretrained": "/root/workspace/Downloads/checkpoint-51800-handbookv2_04",
+    "model_name": "act",
+    "action_horizon": 32,
+    "hand_sim_max_limit": [87.27, 157.08, 130.9, 130.9, 130.9, 130.9],
+    "gripper_sim_max_limit": [100],
+    "model_end_effector_limit": [0, 1],
+    "inverse_gripper": false,
+    "is_gripper_bool": false,
+    "data_type": "real",
+    "client_timeout": 50.0,
+    "use_smooth": true,
+    "save_input": false,
+    "save_vis_images": false,
+    "save_joint_change": false,
+    "service": true,
+    "force_model_reinit": false,
+    "prev_pickle": ""
+}

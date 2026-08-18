@@ -1,0 +1,12 @@
+python3 hdf5_dir_to_lerobot.py \
+  --in_dir ./hdf5_files\
+  --out_dir ./w1_hello \
+  --repo_id ruiji666/w1_hello \
+  --task "wave_arm" \
+  --fps 30 \
+  --cam_keys cam_high_left cam_high_right \
+  --use_state lag \
+  --assume_bgr \
+  --ffmpeg_encoder av1_nvenc \
+  --pix_fmt yuv420p \
+  --progress_every 50

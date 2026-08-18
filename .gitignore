@@ -29,6 +29,17 @@ checkpoints/
 *.pth
 *.ckpt
 
-# Existing local assets are intentionally not imported into this repository.
+# Existing model weights are intentionally not imported into this repository.
 /act_popcorn_45w/
-/w1_act-ljl-act_train/
+
+# W1 source is tracked, while generated/runtime artifacts remain local.
+/w1_act-ljl-act_train/**/checkpoints/
+/w1_act-ljl-act_train/**/log/
+/w1_act-ljl-act_train/**/logs/
+/w1_act-ljl-act_train/**/__pycache__/
+/w1_act-ljl-act_train/**/.pytest_cache/
+/w1_act-ljl-act_train/build/
+/w1_act-ljl-act_train/debian/
+/w1_act-ljl-act_train/dist/
+/w1_act-ljl-act_train/release/
+/w1_act-ljl-act_train/deb-contents.txt

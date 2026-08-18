@@ -1,0 +1,27 @@
+FROM lerobot-pi05-train:20260706
+
+USER root
+
+# hf-libero's EGL extension uses an old CMake minimum version. CMake 4 requires
+# this compatibility policy to build the extension successfully.
+ENV CMAKE_POLICY_VERSION_MINIMUM=3.5
+ENV HF_ENDPOINT=https://hf-mirror.com
+ENV LIBERO_ASSETS_DIR=/opt/libero-assets
+ENV LIBERO_PACKAGE_DIR=/opt/libero-package
+
+RUN python -m pip install --no-cache-dir --no-build-isolation "hf-libero==0.1.4"
+
+RUN LIBERO_PACKAGE_DIR_REAL=$(python -c \
+      "import importlib.util, os; spec = importlib.util.find_spec('libero'); print(os.path.join(os.path.dirname(spec.origin), 'libero'))") && \
+    ln -s "${LIBERO_PACKAGE_DIR_REAL}" "${LIBERO_PACKAGE_DIR}" && \
+    python -c "from huggingface_hub import snapshot_download; snapshot_download(repo_id='lerobot/libero-assets', repo_type='dataset', local_dir='${LIBERO_ASSETS_DIR}', max_workers=1)"
+
+RUN apt-get update && \
+    apt-get install --no-install-recommends -y libegl1 libopengl0 && \
+    rm -rf /var/lib/apt/lists/*
+
+COPY docker/entrypoints/pi05_libero_smoke_entrypoint.sh /usr/local/bin/pi05_libero_smoke_entrypoint.sh
+RUN chmod 755 /usr/local/bin/pi05_libero_smoke_entrypoint.sh
+
+ENTRYPOINT ["/usr/local/bin/pi05_libero_smoke_entrypoint.sh"]
+CMD ["bash"]

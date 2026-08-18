@@ -1,0 +1,78 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--================================================================================================================-->
+<!--                                          DexForce Technology Co., Ltd                                          -->
+<!--                                                                                                                -->
+<!--                                       Robot URDF Model Generation Report                                       -->
+<!--                                      Generation Time: 2026-07-24 19:21:00                                      -->
+<!--                                  Version: DexForce URDF assembly manager V2.0                                  -->
+<!--                                             Included Modules: head                                             -->
+<!--                                           head: {'version': 'v024'}                                            -->
+<!--================================================================================================================-->
+<robot name="head__v024">
+  <link name="head_base_link"> </link>
+  <link name="neck_base"> </link>
+  <link name="neck1">
+    <inertial>
+      <origin xyz="8.0771079e-05 -4.9617728e-03  5.2251935e-02 " rpy="0 0 0" />
+      <mass value="1.013" />
+      <inertia ixx="1.76988687535663E-05" ixy="-3.29843265585722E-14" ixz="1.12004314355796E-12" iyy="1.698812924773E-05" iyz="4.19769754584448E-06" izz="1.42153718545556E-05" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/head/head1.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/head/head1.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="neck2">
+    <inertial>
+      <origin xyz="3.7388488e-02 -5.6053722e-02 -2.5134137e-03" rpy="0 0 0" />
+      <mass value="0.476" />
+      <inertia ixx="1.0966101e-03" ixy="1.1008961e-05" ixz="-3.8162802e-05" iyy="1.3634570e-03" iyz="4.5154370e-05" izz="1.0942949e-03" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/head/head2.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/head/head2.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="eyes">
+  </link>
+  <joint name="NECK_BASE" type="fixed">
+    <origin xyz="0 0 0.333" rpy="0 0 0" />
+    <parent link="head_base_link" />
+    <child link="neck_base" />
+  </joint>
+  <joint name="NECK1" type="revolute">
+    <origin xyz="0 0 0" rpy="0 0 0" />
+    <parent link="neck_base" />
+    <child link="neck1" />
+    <axis xyz="0 0 1" />
+    <limit lower="-1.5707963267948966" upper="1.5707963267948966" effort="14" velocity="3.141592653589793" />
+  </joint>
+  <joint name="NECK2" type="revolute">
+    <origin xyz="0 0 0.042" rpy="-1.5707963267948966 0 0" />
+    <parent link="neck1" />
+    <child link="neck2" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-0.7853981633974483" upper="0.6981317007977318" effort="14" velocity="3.141592653589793" />
+  </joint>
+  <joint name="EYES" type="fixed">
+    <origin xyz="0.091 -0.051 0.0" rpy="2.8789951717586626 1.5707963267948966 0.0" />
+    <parent link="neck2" />
+    <child link="eyes" />
+  </joint>
+</robot>

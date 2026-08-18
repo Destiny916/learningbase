@@ -1,0 +1,117 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--================================================================================================================-->
+<!--                                          DexForce Technology Co., Ltd                                          -->
+<!--                                                                                                                -->
+<!--                                       Robot URDF Model Generation Report                                       -->
+<!--                                      Generation Time: 2026-07-24 19:21:00                                      -->
+<!--                                  Version: DexForce URDF assembly manager V2.0                                  -->
+<!--                                            Included Modules: torso                                             -->
+<!--                                           torso: {'version': 'v024'}                                           -->
+<!--================================================================================================================-->
+<robot name="torso__v024">
+  <link name="torso_base_link"> </link>
+  <link name="ankle">
+    <inertial>
+      <origin xyz="7.5724930e-06 1.0842689e-01 1.1342347e-02" rpy="0 0 0" />
+      <mass value="7.65" />
+      <inertia ixx="1.2284588e-01" ixy="-1.5787495e-06" ixz="3.9452057e-07" iyy="3.7890955e-02" iyz="1.6186487e-02" izz="9.4060170e-02" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/torso/torso1.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/torso/torso1.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="knee">
+    <inertial>
+      <origin xyz="-3.4388584e-04 1.0225161e-01 4.8492151e-03" rpy="0 0 0" />
+      <mass value="6.35" />
+      <inertia ixx="9.0503741e-02" ixy="2.8160702e-04" ixz="-5.0697857e-06" iyy="1.5713994e-02" iyz="9.1849975e-03" izz="8.0515731e-02" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/torso/torso2.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/torso/torso2.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="buttock">
+    <inertial>
+      <origin xyz="1.3631567e-03 6.2186961e-02 6.4544807e-03" rpy="0 0 0" />
+      <mass value="7.85" />
+      <inertia ixx="3.8403492e-02" ixy="4.0901436e-04" ixz="6.6403948e-05" iyy="1.8694639e-02" iyz="2.9350799e-03" izz="3.4016462e-02" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/torso/torso3.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/torso/torso3.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <link name="waist">
+    <inertial>
+      <origin xyz="6.4016818e-03  4.8188781e-04  2.0011730e-01" rpy="0 0 0" />
+      <mass value="8.196" />
+      <inertia ixx="9.4768963e-02" ixy="3.6070706e-04" ixz="1.5765521e-03" iyy="7.8791635e-02" iyz="-7.5017650e-03" izz="3.8690356e-02" />
+    </inertial>
+    <visual>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="visual/torso/torso4.glb" />
+      </geometry>
+    </visual>
+    <collision>
+      <origin xyz="0 0 0" rpy="0 0 0" />
+      <geometry>
+        <mesh filename="collision/torso/torso4.obj" />
+      </geometry>
+    </collision>
+  </link>
+  <joint name="ANKLE" type="revolute">
+    <origin xyz="0 0 0.2875" rpy="1.5707963267948966 0 0" />
+    <parent link="torso_base_link" />
+    <child link="ankle" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.5707963267948966" upper="1.5707963267948966" effort="140" velocity="3.141592653589793" />
+  </joint>
+  <joint name="KNEE" type="revolute">
+    <origin xyz="0 0.34 0" rpy="0 0 0" />
+    <parent link="ankle" />
+    <child link="knee" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-2.705260340591211" upper="2.705260340591211" effort="140" velocity="3.141592653589793" />
+  </joint>
+  <joint name="BUTTOCK" type="revolute">
+    <origin xyz="0 0.34 0" rpy="0 0 0" />
+    <parent link="knee" />
+    <child link="buttock" />
+    <axis xyz="0 0 -1" />
+    <limit lower="-1.5707963267948966" upper="1.9198621771937625" effort="140" velocity="3.141592653589793" />
+  </joint>
+  <joint name="WAIST" type="revolute">
+    <origin xyz="0 0.158 0" rpy="-1.5707963267948966 0 0" />
+    <parent link="buttock" />
+    <child link="waist" />
+    <axis xyz="0 0 1" />
+    <limit lower="-3.7524578917878086" upper="2.181661564992912" effort="140" velocity="3.141592653589793" />
+  </joint>
+</robot>

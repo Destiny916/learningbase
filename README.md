@@ -1,33 +1,28 @@
 # Popcorn training algorithms
 
-This repository is the initial, versioned workspace for future training on the Popcorn W1 dataset. The current phase only synchronizes source code, records the data/model contract, and provides offline checks. It does **not** start training, download model weights, build Docker images, or control a robot.
+This repository is the initial, versioned workspace for future training on the Popcorn W1 dataset. Algorithm and W1 ACT source files are committed directly in this repository so later changes can be made and pushed without updating separate submodules. The current phase only synchronizes source code, records the data/model contract, and provides offline checks. It does **not** start training, download model weights, build Docker images, or control a robot.
 
 ## Checkout
 
 ```bash
-git clone --recurse-submodules http://192.168.10.28:3000/chengdu/popcorn.git
+git clone http://192.168.10.28:3000/chengdu/popcorn.git
 cd popcorn
 bash scripts/verify_stack.sh
 ```
 
-If the repository was cloned without submodules:
-
-```bash
-git submodule update --init --recursive
-```
-
 ## Included sources
 
-| Path | Source branch | Purpose |
+| Path | Imported source | Purpose |
 | --- | --- | --- |
-| `algorithms/act` | `chengdu/lerobot_joint.git`, `main` | Standard LeRobot ACT source |
-| `algorithms/act_dinov3` | `chengdu/lerobot_joint.git`, `feat/act-dinov3` | ACT with the shared DINOv3 visual backbone |
-| `algorithms/turbovla` | `chengdu/turboVLA.git`, `main` | TurboVLA source and Joint Songling recipes |
-| `algorithms/turbovla_patchvision` | `chengdu/turboVLA.git`, `feature/turbovla-patchvision-t2-act` | Historical PatchVision T2 implementation |
+| `algorithms/act` | LeRobot `main` | Standard LeRobot ACT source |
+| `algorithms/act_dinov3` | LeRobot `feat/act-dinov3` | ACT with the shared DINOv3 visual backbone |
+| `algorithms/turbovla` | TurboVLA `main` | TurboVLA source and Joint Songling recipes |
+| `algorithms/turbovla_patchvision` | TurboVLA PatchVision branch | PatchVision T2 implementation |
+| `w1_act-ljl-act_train` | Local W1 source snapshot | Existing W1 ACT, simulation, inference, and URDF source |
 | `dexchain` | local audited snapshot | Docker environment helpers; no credentials |
 | `howtotrain` | local audited snapshot | Existing training and deployment notes |
 
-The submodule commit recorded by this repository is authoritative. The branch names in `.gitmodules` describe the intended update source; running `git submodule update --remote` is an explicit maintenance operation, not part of verification.
+Exact upstream URLs, branches, and imported commits are recorded in `UPSTREAM_SOURCES.md`. The algorithm directories intentionally contain no nested Git metadata.
 
 ## Popcorn contract
 

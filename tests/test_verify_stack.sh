@@ -10,5 +10,6 @@ if [[ ! -x "$verifier" ]]; then
 fi
 
 output="$(bash "$verifier")"
+grep -Fq "Vendored algorithm sources: PASS" <<<"$output"
 grep -Fq "Popcorn training stack verification: PASS" <<<"$output"
 printf '%s\n' "$output"

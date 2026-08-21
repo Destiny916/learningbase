@@ -178,17 +178,17 @@ git commit -m "feat: add simulation-only XWiz ACT server"
 - Create: `w1_act-ljl-act_train/xwiz_act_server/start_local.sh`
 - Test: `tests/xwiz_act_server/test_model_runtime.py`
 
-- [ ] **Step 1: Write failing runtime boundary tests**
+- [x] **Step 1: Write failing runtime boundary tests**
 
 Test pure validation helpers without importing torch: checkpoint must contain `config.json`, `model.safetensors`, `policy_preprocessor.json`, and `policy_postprocessor.json`; `validate_action_chunk()` accepts finite `(100,19)` and rejects other shapes/non-finite values.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `PYTHONPATH=w1_act-ljl-act_train pytest -q tests/xwiz_act_server/test_model_runtime.py`
 
 Expected: import fails because `model_runtime.py` is absent.
 
-- [ ] **Step 3: Implement runtime**
+- [x] **Step 3: Implement runtime**
 
 Use lazy imports inside `LeRobotActRuntime.__init__`. Load `TrainPipelineConfig.from_pretrained(..., local_files_only=True)`, set device, then `ACTPolicy.from_pretrained(..., config=policy_config, strict=True)`. Load both processor pipelines, move normalizer to CUDA and unnormalizer to CPU, call `predict_action_chunk`, postprocess `{ACTION: chunk}`, and validate exactly `(100,19)`.
 
@@ -201,18 +201,18 @@ exec /home/wengyikun/workplace/joint_songling/lerobot/.venv/bin/python \
   --policy-path /home/wengyikun/workplace/popcorn/act_popcorn_45w --device cuda
 ```
 
-- [ ] **Step 4: Run GREEN unit tests**
+- [x] **Step 4: Run GREEN unit tests**
 
 Run: `PYTHONPATH=w1_act-ljl-act_train pytest -q tests/xwiz_act_server`
 
 Expected: all pure tests pass without CUDA model load.
 
-- [ ] **Step 5: Install isolated small dependencies and run real checkpoint smoke test**
+- [x] **Step 5: Install isolated small dependencies and run real checkpoint smoke test**
 
 Run:
 
 ```bash
-/home/wengyikun/workplace/joint_songling/lerobot/.venv/bin/pip install \
+/home/wengyikun/workplace/joint_songling/lerobot/.venv/bin/pip install --no-deps \
   --target /home/wengyikun/.local/share/popcorn-xwiz-act/runtime-deps \
   -r w1_act-ljl-act_train/xwiz_act_server/runtime-requirements.txt
 PYTHONPATH=/home/wengyikun/.local/share/popcorn-xwiz-act/runtime-deps:$PWD/w1_act-ljl-act_train/w1_lerobot/src:$PWD/w1_act-ljl-act_train \
@@ -223,7 +223,7 @@ PYTHONPATH=/home/wengyikun/.local/share/popcorn-xwiz-act/runtime-deps:$PWD/w1_ac
 
 Expected: strict checkpoint load succeeds and one synthetic three-camera/19D inference returns finite `(100,19)`.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add w1_act-ljl-act_train/xwiz_act_server tests/xwiz_act_server/test_model_runtime.py

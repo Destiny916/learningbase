@@ -131,7 +131,7 @@ git commit -m "feat: adapt W1 observations and ACT actions"
 - Create: `w1_act-ljl-act_train/xwiz_act_server/server.py`
 - Test: `tests/xwiz_act_server/test_server.py`
 
-- [ ] **Step 1: Write failing lifecycle tests**
+- [x] **Step 1: Write failing lifecycle tests**
 
 Use `FakeRuntime.predict()` returning a finite `(100,19)` array. Verify:
 
@@ -147,23 +147,23 @@ assert reply["actions"]["qpos"]["left_armqpos"].shape == (100, 7)
 
 Also assert setup rejects `data_type="real"`, `get_actions` before inference returns `status="pending"`, and `STOP` clears stored actions and returns idle.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `PYTHONPATH=w1_act-ljl-act_train pytest -q tests/xwiz_act_server/test_server.py`
 
 Expected: import fails because `server.py` is absent.
 
-- [ ] **Step 3: Implement minimal state machine and TCP loop**
+- [x] **Step 3: Implement minimal state machine and TCP loop**
 
 Implement `XWizActServerApp.handle()` for `SETUP_CONFIG`, `STATUS`, `observation`, `get_actions`, `STOP`, and `SHUTDOWN`. Preserve request IDs in replies. Only infer when `start_infer` is true; store timestamp/timestep with the latest grouped action. Implement a sequential TCP accept loop using `protocol.recv_message/send_message`.
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 Run: `PYTHONPATH=w1_act-ljl-act_train pytest -q tests/xwiz_act_server/test_server.py`
 
 Expected: all lifecycle tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add w1_act-ljl-act_train/xwiz_act_server/server.py tests/xwiz_act_server/test_server.py

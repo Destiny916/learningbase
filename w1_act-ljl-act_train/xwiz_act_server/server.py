@@ -73,6 +73,10 @@ class XWizActServerApp:
         return {"success": True, "state": "running"}
 
     def _observation(self, request: dict[str, Any]) -> dict[str, Any]:
+        if self.state == "idle":
+            # STOP can race with one already-queued observation from PC2.
+            # Acknowledge it without inference so the client remains idle.
+            return {"status": "received", "inferred": False}
         if self.state != "running":
             raise RuntimeError(f"server is not running: {self.state}")
         inferred = bool(request.get("start_infer", False))
@@ -82,17 +86,29 @@ class XWizActServerApp:
             self.latest_actions = group_action_chunk(actions)
             self.latest_timestamp = float(request.get("timestamp", 0.0))
             self.latest_timestep = int(request.get("timestep", 0))
+            LOGGER.info(
+                "inference completed timestep=%d action_shape=(100,19)",
+                self.latest_timestep,
+            )
         return {"status": "received", "inferred": inferred}
 
     def _get_actions(self) -> dict[str, Any]:
         if self.latest_actions is None:
             return {"status": "pending"}
-        return {
+        wire_actions = {
+            name: values.tolist() for name, values in self.latest_actions.items()
+        }
+        reply = {
             "status": "success",
-            "actions": {"qpos": self.latest_actions},
+            "actions": {"qpos": wire_actions},
             "timestamp": self.latest_timestamp,
             "timestep": self.latest_timestep,
         }
+        # The vendor client polls get_actions continuously. Each inference
+        # chunk must be consumed exactly once or it will aggregate the same
+        # chunk repeatedly before executing any simulation frame.
+        self.latest_actions = None
+        return reply
 
     def _stop(self) -> dict[str, Any]:
         self.latest_actions = None

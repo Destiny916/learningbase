@@ -49,7 +49,11 @@ def test_simulation_lifecycle_produces_legacy_action_response():
     assert reply["request_id"] == 3
     assert reply["timestamp"] == 12.5
     assert reply["timestep"] == 8
-    assert reply["actions"]["qpos"]["left_armqpos"].shape == (100, 7)
+    left_arm = reply["actions"]["qpos"]["left_armqpos"]
+    assert isinstance(left_arm, list)
+    assert isinstance(left_arm[0], list)
+    assert np.asarray(left_arm).shape == (100, 7)
+    assert app.handle({"type": "get_actions"})["status"] == "pending"
 
 
 def test_setup_rejects_real_mode():
@@ -87,3 +91,10 @@ def test_stop_clears_actions_and_returns_idle():
     reply = app.handle({"type": "STOP"})
     assert reply == {"success": True, "state": "idle"}
     assert app.handle({"type": "get_actions"})["status"] == "pending"
+
+    late_observation = observation_request()
+    late_observation.update({"type": "observation", "start_infer": True})
+    assert app.handle(late_observation) == {
+        "status": "received",
+        "inferred": False,
+    }

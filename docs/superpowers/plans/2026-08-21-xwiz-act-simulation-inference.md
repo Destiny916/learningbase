@@ -295,7 +295,7 @@ Then call `/inference/stop_inference` and verify client state returns idle.
 
 Document start/stop commands, logs, task fields, black wrist behavior, and the future PC2 migration checklist in Chinese.
 
-- [ ] **Step 5: Final verification and commit**
+- [x] **Step 5: Final verification and commit**
 
 Run:
 

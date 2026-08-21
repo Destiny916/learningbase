@@ -32,7 +32,7 @@
 - Create: `w1_act-ljl-act_train/xwiz_act_server/protocol.py`
 - Test: `tests/xwiz_act_server/test_protocol.py`
 
-- [ ] **Step 1: Write failing framing tests**
+- [x] **Step 1: Write failing framing tests**
 
 ```python
 def test_round_trip_frame_over_socketpair():
@@ -47,23 +47,23 @@ def test_rejects_frame_larger_than_limit():
         recv_message(right)
 ```
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `PYTHONPATH=w1_act-ljl-act_train pytest -q tests/xwiz_act_server/test_protocol.py`
 
 Expected: collection fails because `xwiz_act_server.protocol` does not exist.
 
-- [ ] **Step 3: Implement minimal framing**
+- [x] **Step 3: Implement minimal framing**
 
 Implement `recv_exact()`, `recv_message()`, and `send_message()` using a four-byte big-endian length and `pickle.dumps/loads`. Set `MAX_FRAME_BYTES = 64 * 1024 * 1024`; raise `ProtocolError` for EOF, invalid types, and oversized frames.
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 Run: `PYTHONPATH=w1_act-ljl-act_train pytest -q tests/xwiz_act_server/test_protocol.py`
 
 Expected: all protocol tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add w1_act-ljl-act_train/xwiz_act_server tests/xwiz_act_server/test_protocol.py

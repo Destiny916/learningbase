@@ -54,10 +54,13 @@ xwiz
 ssh dexforce@192.168.20.20
 sudo systemctl stop dexe-auto.service dexe-auto.timer \
   dexe-tele.service dexe-act.service dexe-map.service
+sudo systemctl disable --now dexe-auto.timer
 docker stop act_ros2 2>/dev/null || true
 ```
 
 不要停止 `dexe-system.service` 和 `dexe-basic.service`。
+
+上面的 `disable` 是为了防止 Auto 在重启后自动重新占用控制链路。需要恢复原厂Auto时，再显式执行 `sudo systemctl enable --now dexe-auto.timer`。
 
 确认头部图像；没有发布器时启动KFC相机：
 

@@ -236,7 +236,7 @@ git commit -m "feat: load W1 LeRobot ACT checkpoint"
 - Modify: `/home/wengyikun/.dexforce/XWiz/model_deployments/tasks/1/task_config.json`
 - Deploy: `/home/dexforce/w1/w1_act/xwiz_safe_runtime/` on PC2
 
-- [ ] **Step 1: Back up and patch XWiz task config**
+- [x] **Step 1: Back up and patch XWiz task config**
 
 Create a timestamped backup beside `task_config.json`, then set:
 
@@ -254,15 +254,15 @@ Create a timestamped backup beside `task_config.json`, then set:
 
 Set `server_config.data_type` to `simulation` and `save_input` to false.
 
-- [ ] **Step 2: Start server and verify model-ready status**
+- [x] **Step 2: Start server and verify model-ready status**
 
 Run `start_local.sh` under `nohup`, write `/home/wengyikun/xwiz_act_server.log`, and wait conditionally until `ss -ltnp` shows `0.0.0.0:8889`. Fail if the model load log contains an exception.
 
-- [ ] **Step 3: Re-deploy and verify PC2 safety client**
+- [x] **Step 3: Re-deploy and verify PC2 safety client**
 
 Copy the existing safe wrapper, restart only `safe_client_service.py`, keep the black wrist publisher, and verify `mode=1`, empty home, 8890 listener, and PC1 manager connection. Do not start Auto/Tele/ACT services.
 
-- [ ] **Step 4: Protocol integration without XWiz**
+- [x] **Step 4: Protocol integration without XWiz**
 
 Send PC2 manager a simulation `SETUP_CONFIG`, observe server `STATUS=running`, allow one observation to produce a finite `100×19` action, and immediately issue `STOP`. Verify only `/mj_sim/control/*` receives the client publisher and real control topics gain no new client publisher.
 
@@ -271,15 +271,15 @@ Send PC2 manager a simulation `SETUP_CONFIG`, observe server `STATUS=running`, a
 **Files:**
 - Update: `/home/wengyikun/workplace/popcorn/howtotrain/XWiz_本机使用说明.md`
 
-- [ ] **Step 1: Record safety baseline**
+- [x] **Step 1: Record safety baseline**
 
 Record current owners/publishers for `/control/joint_position`, `/control/ee/left`, `/control/ee/right`, PC1 mode services, and PC2 inference processes. Confirm PC2 safe wrapper and local server are the intended owners.
 
-- [ ] **Step 2: Invoke the same ROS service payload used by XWiz simulation button**
+- [x] **Step 2: Invoke the same ROS service payload used by XWiz simulation button**
 
 Call `/inference/start_inference` with the selected model/task in simulation mode. This validates the button backend without GUI automation. Watch PC1 manager, PC2 client, and local server logs until one inference succeeds.
 
-- [ ] **Step 3: Verify success and stop**
+- [x] **Step 3: Verify success and stop**
 
 Require all of:
 
@@ -291,7 +291,7 @@ Require all of:
 
 Then call `/inference/stop_inference` and verify client state returns idle.
 
-- [ ] **Step 4: Document operation and migration boundary**
+- [x] **Step 4: Document operation and migration boundary**
 
 Document start/stop commands, logs, task fields, black wrist behavior, and the future PC2 migration checklist in Chinese.
 

@@ -1,5 +1,6 @@
 # Local planning and editor state
 .planning/
+.worktrees/
 .idea/
 .vscode/
 

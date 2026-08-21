@@ -76,7 +76,7 @@ git commit -m "feat: add XWiz framed pickle protocol"
 - Create: `w1_act-ljl-act_train/xwiz_act_server/contract.py`
 - Test: `tests/xwiz_act_server/test_contract.py`
 
-- [ ] **Step 1: Write failing mapping tests**
+- [x] **Step 1: Write failing mapping tests**
 
 Create a legacy observation containing:
 
@@ -93,13 +93,13 @@ states = {
 
 Assert `decode_observation()` returns state order `[3,10..16,20,21,30..36,40,41]`, maps `cam_high`/wrist keys to the three training keys, converts BGR red `[0,0,255]` to RGB `[255,0,0]`, and rejects missing keys or non-640×360 images. Assert `group_action_chunk(np.zeros((100,19)))` produces group widths `1,7,2,7,1,1` and rejects NaN or wrong shape.
 
-- [ ] **Step 2: Run RED**
+- [x] **Step 2: Run RED**
 
 Run: `PYTHONPATH=w1_act-ljl-act_train pytest -q tests/xwiz_act_server/test_contract.py`
 
 Expected: import fails because `contract.py` is absent.
 
-- [ ] **Step 3: Implement minimal contract functions**
+- [x] **Step 3: Implement minimal contract functions**
 
 Define constants for legacy/training keys and implement:
 
@@ -112,13 +112,13 @@ def group_action_chunk(actions: np.ndarray) -> dict[str, np.ndarray]: ...
 
 Require exactly `(100,19)` finite actions and return `waistqpos`, `left_armqpos`, `headqpos`, `right_armqpos`, `left_eefgripper`, `right_eefgripper`.
 
-- [ ] **Step 4: Run GREEN**
+- [x] **Step 4: Run GREEN**
 
 Run: `PYTHONPATH=w1_act-ljl-act_train pytest -q tests/xwiz_act_server/test_contract.py`
 
 Expected: all contract tests pass.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add w1_act-ljl-act_train/xwiz_act_server/contract.py tests/xwiz_act_server/test_contract.py

@@ -56,12 +56,18 @@ def test_simulation_lifecycle_produces_legacy_action_response():
     assert app.handle({"type": "get_actions"})["status"] == "pending"
 
 
-def test_setup_rejects_real_mode():
+def test_setup_accepts_real_mode_for_the_same_ros_independent_model_runtime():
     app = XWizActServerApp(FakeRuntime())
     reply = app.handle(setup_request(data_type="real"))
+    assert reply == {"success": True, "state": "running", "request_id": 1}
+
+
+def test_setup_rejects_unknown_data_type():
+    app = XWizActServerApp(FakeRuntime())
+    reply = app.handle(setup_request(data_type="hardware_magic"))
     assert reply["success"] is False
     assert reply["state"] == "error"
-    assert "simulation" in reply["error"]
+    assert "data_type" in reply["error"]
 
 
 def test_get_actions_is_pending_before_inference():

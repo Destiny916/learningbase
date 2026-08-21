@@ -1,0 +1,30 @@
+{
+  "client_config": {
+    "action_horizon": 100,
+    "chunk_size_threshold": 0.0,
+    "collect_frequency": 10,
+    "control_frequency": 10,
+    "end_effector_type": "gripper",
+    "home_position": "",
+    "sample_factor": 1.0,
+    "server_host": "192.168.20.164",
+    "server_port": 8889,
+    "time_infer": 0.5,
+    "use_hand_camera": true,
+    "hand_target_size": [640, 360],
+    "mode": 1
+  },
+  "description": "仿真：部署后立即推理并执行一个100帧ACT动作块，不发布真机控制话题",
+  "instruction": "1123",
+  "last_updated": 1787291897365,
+  "max_duration": 10,
+  "name": "ACT Popcorn 仿真100帧",
+  "server_config": {
+    "data_type": "simulation",
+    "inverse_gripper": false,
+    "is_gripper_bool": false,
+    "save_input": false
+  },
+  "status": "未知",
+  "task_id": 1
+}

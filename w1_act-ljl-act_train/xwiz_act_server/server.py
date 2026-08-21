@@ -1,4 +1,4 @@
-"""Simulation-only server compatible with the vendor PC2 inference client."""
+"""ROS-independent ACT server compatible with the vendor PC2 inference client."""
 
 from __future__ import annotations
 
@@ -64,8 +64,9 @@ class XWizActServerApp:
     def _setup(self, config: Any) -> dict[str, Any]:
         if not isinstance(config, dict):
             raise ValueError("config must be a mapping")
-        if config.get("data_type") != "simulation":
-            raise ValueError("simulation-only server rejects non-simulation data_type")
+        data_type = config.get("data_type")
+        if data_type not in {"simulation", "real"}:
+            raise ValueError(f"unsupported data_type: {data_type!r}")
         self.runtime.reset()
         self.latest_actions = None
         self.error = None

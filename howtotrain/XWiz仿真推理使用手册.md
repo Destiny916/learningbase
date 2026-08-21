@@ -1,344 +1,205 @@
-# XWiz 仿真推理使用手册
+# XWiz 仿真与真机推理使用手册
 
-## 1. 重启后能否直接开始
+## 1. 当前交互规则
 
-当前不能保证整机重启后不检查就直接点击“仿真推理”。
+XWiz 原厂“部署”按钮会下发配置并立即启动推理，不需要再点一次“开始推理”。当前用两个任务隔离模式：
 
-原因是目前只有本机 ACT 模型服务配置了用户级自启动；以下进程仍是手动后台进程，重启 PC1 或 PC2 后不会自动恢复：
+| XWiz选择 | 模式 | 输出位置 | 点击“部署”后的行为 |
+|---|---|---|---|
+| 模型1 + 任务1 | 仿真 | `/mj_sim/control/*` | 立即推理并执行100帧仿真动作 |
+| 模型1 + 任务2 | 真机 | `/control/joint_position`、`/control/ee/left`、`/control/ee/right` | 安全检查通过后立即推理并执行一个100帧动作块 |
 
-- PC1 `run_inference_manager_safe.py` 推理管理器。
-- PC1 KFC 头部双目相机节点。
-- PC2 `safe_client_service.py` 仿真安全客户端。
-- PC2 `black_wrist_images.py` 左右腕部黑图发布器。
+两个任务都固定为 `action_horizon=100`、`max_steps=100`、`sample_factor=1`、`chunk_size_threshold=0`、`home_position=""`。真机任务不会自动复位；机器人必须事先位于 ACT 默认姿势。
 
-此外，PC1 的 `dexe-auto.timer` 当前虽然未运行，但仍处于 enabled。PC1 重启后必须检查 Auto 是否被拉起，防止它与仿真推理同时占用控制链路。
+真机动作是 `100×19` 绝对目标：17维身体关节加左右夹爪开合度。夹爪标量 `0=完全闭合`、`100=完全张开`，运行时转换为左右 Linker L6 的6维手指命令。控制频率10 Hz，一个动作块约10秒，第100帧后自动停止。
 
-本机 `xwiz-act-server.service` 已 enabled，但本机用户 `Linger=no`，因此它会在用户登录桌面后启动，而不是在无人登录时启动。
-
-结论：
-
-- 只重启 XWiz 图形界面、不重启三台机器：通常可直接重新打开 XWiz 使用。
-- 重启本机并重新登录桌面：先确认本机 8889 服务正常，再使用。
-- 重启 PC1 或 PC2：需要按本文第 3 节恢复安全推理链路。
-
-## 2. 当前部署结构
+## 2. 三端结构
 
 ```text
 本机 192.168.20.164
-  XWiz 图形界面
-  act_popcorn_45w CUDA 推理服务 :8889
-            |
-            v
+  XWiz GUI
+  act_popcorn_45w CUDA模型服务 :8889
+                 |
 PC1 192.168.20.20
-  inference_manager ROS 服务
-            |
-            v
+  xwiz_real_runtime.manager_service
+                 |
 PC2 192.168.20.21
-  safe_client_service :8890
-  左右腕部黑图
-  仅发布 /mj_sim/control/*
+  xwiz_real_runtime.client_service :8890
+  xwiz_real_runtime.black_wrist_images
 ```
 
-XWiz 中使用：
+模型目录：`/home/wengyikun/workplace/popcorn/act_popcorn_45w`。
 
-- 模型 ID：`1`
-- 任务 ID：`1`
-- 推理模式：`仿真`
-- 模型目录：`/home/wengyikun/workplace/popcorn/act_popcorn_45w/pretrained_model`
-- 模型输入：19 维状态、真实左头部图像、左右腕部黑图。
-- 模型输出：`100x19` 绝对关节目标。
+PC1/PC2运行代码：`/home/dexforce/w1/w1_act/xwiz_real_runtime/`。
 
-## 3. 三台机器重启后的启动顺序
+## 3. 全部重启后的启动顺序
 
-### 3.1 检查网络
-
-在本机执行：
+### 3.1 本机
 
 ```bash
 ping -c 1 192.168.20.20
 ping -c 1 192.168.20.21
-```
 
-两台机器人 PC 都能访问后再继续。
-
-### 3.2 检查本机模型服务
-
-```bash
+systemctl --user restart xwiz-act-server.service
 systemctl --user status xwiz-act-server.service --no-pager
 ss -ltnp | grep ':8889'
-```
-
-如果没有运行：
-
-```bash
-systemctl --user restart xwiz-act-server.service
 journalctl --user -u xwiz-act-server.service -n 50 --no-pager
+
+xwiz
 ```
 
-正常日志应包含：
-
-```text
-Loading weights from local directory
-listening on 0.0.0.0:8889
-```
-
-### 3.3 停止 PC1 的真机控制模式
-
-登录 PC1：
+### 3.2 PC1：停止冲突控制源并恢复相机
 
 ```bash
 ssh dexforce@192.168.20.20
-```
-
-检查状态：
-
-```bash
-systemctl is-active dexe-auto.service dexe-auto.timer \
+sudo systemctl stop dexe-auto.service dexe-auto.timer \
   dexe-tele.service dexe-act.service dexe-map.service
-docker ps --filter name=act_ros2
-pgrep -af 'policy_infer.py|policy_bridge_origin.py'
-```
-
-仿真推理前应停止 Auto 和旧 ACT 容器：
-
-```bash
-sudo systemctl stop dexe-auto.service dexe-auto.timer
 docker stop act_ros2 2>/dev/null || true
 ```
 
-不要停止以下机器人底层服务：
+不要停止 `dexe-system.service` 和 `dexe-basic.service`。
 
-```text
-dexe-system.service
-dexe-basic.service
-```
-
-### 3.4 启动 PC1 头部相机
-
-先检查：
-
-```bash
-pgrep -af 'kfc_nodes.launch|kfc_publisher'
-```
-
-如果没有进程，执行：
+确认头部图像；没有发布器时启动KFC相机：
 
 ```bash
 export ROS_DOMAIN_ID=20
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 source /opt/ros/humble/setup.bash
 source /home/dexforce/w1/install/setup.bash
+
+ros2 topic info /camera/left_eye_resize
+ros2 topic info /camera/right_eye_resize
 
 nohup ros2 launch dexe_sensors_launch kfc_nodes.launch.py \
   kfc_mode:=resize_compressed \
   > /home/dexforce/kfc_camera.log 2>&1 < /dev/null &
 ```
 
-检查双目图像：
-
-```bash
-ros2 topic hz /camera/left_eye_resize
-ros2 topic hz /camera/right_eye_resize
-```
-
-### 3.5 启动 PC2 黑图和安全客户端
-
-登录 PC2：
+### 3.3 PC2：腕部黑图与双模式客户端
 
 ```bash
 ssh dexforce@192.168.20.21
-```
-
-加载环境：
-
-```bash
-export PYTHONPATH=/home/dexforce/w1/w1_act
 export ROS_DOMAIN_ID=20
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 source /opt/ros/humble/setup.bash
 source /home/dexforce/w1/install/setup.bash
-cd /home/dexforce/w1/w1_act
-```
+export PYTHONPATH=/home/dexforce/w1/w1_act:${PYTHONPATH}
 
-先检查，避免重复启动：
-
-```bash
-pgrep -af 'black_wrist_images.py|safe_client_service.py'
-```
-
-缺少黑图发布器时执行：
-
-```bash
-nohup python3 xwiz_safe_runtime/black_wrist_images.py \
+nohup python3 -m xwiz_real_runtime.black_wrist_images \
   > /home/dexforce/xwiz_black_wrist.log 2>&1 < /dev/null &
-```
 
-缺少安全客户端时执行：
-
-```bash
-cd /home/dexforce/w1/w1_act/xwiz_safe_runtime
-nohup python3 safe_client_service.py --config client_simulation.json \
-  >> /home/dexforce/xwiz_safe_client.log 2>&1 < /dev/null &
+nohup python3 -m xwiz_real_runtime.client_service \
+  --config /home/dexforce/w1/w1_act/xwiz_real_runtime/client_runtime.json \
+  > /home/dexforce/xwiz_real_client.log 2>&1 < /dev/null &
 ```
 
 检查：
 
 ```bash
-ss -ltn | grep ':8890'
-ros2 topic hz /camera_l/color/image_rect_raw
-ros2 topic hz /camera_r/color/image_rect_raw
+pgrep -af 'xwiz_real_runtime.(black_wrist_images|client_service)'
+ss -ltnp | grep ':8890'
+ros2 topic info /camera_l/color/image_rect_raw
+ros2 topic info /camera_r/color/image_rect_raw
+tail -100 /home/dexforce/xwiz_real_client.log
 ```
 
-### 3.6 启动 PC1 推理管理器
+不要重复启动同名进程。
 
-回到 PC1，先检查：
-
-```bash
-pgrep -af run_inference_manager_safe.py
-```
-
-如果没有进程，执行：
+### 3.4 PC1：推理管理器
 
 ```bash
-cd /home/dexforce/w1/w1_act
-export PYTHONPATH=$PWD
+ssh dexforce@192.168.20.20
 export ROS_DOMAIN_ID=20
 export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
 source /opt/ros/humble/setup.bash
 source /home/dexforce/w1/install/setup.bash
+export PYTHONPATH=/home/dexforce/w1/w1_act:${PYTHONPATH}
 
-nohup python3 run_inference_manager_safe.py \
-  > /home/dexforce/inference_manager.log 2>&1 < /dev/null &
+nohup python3 -m xwiz_real_runtime.manager_service \
+  > /home/dexforce/xwiz_real_manager.log 2>&1 < /dev/null &
 ```
 
-检查服务和状态：
+检查：
 
 ```bash
-ros2 service list | grep /inference
-ros2 topic echo --once /inference/status
+pgrep -af 'xwiz_real_runtime.manager_service'
+ros2 service type /inference/deploy
+ros2 service type /inference/stop_inference
+tail -100 /home/dexforce/xwiz_real_manager.log
 ```
 
-空闲状态应为：
+## 4. 仿真操作
 
-```text
-status: 1
-message: ok
-```
+1. 在“模型部署”中选择模型1、任务1。
+2. 确认任务名称为仿真任务。
+3. 点击“部署”。这一步会立即启动仿真推理。
+4. 结束时点击“停止推理”；单块模式也会在100帧后停止。
 
-## 4. 在 XWiz 中开始仿真推理
-
-本机启动 XWiz：
+验证：
 
 ```bash
-xwiz
-```
-
-操作步骤：
-
-1. 打开“模型部署”。
-2. 选择模型 ID `1`。
-3. 选择任务 ID `1`。
-4. 选择“仿真”模式，不要选择真机模式。
-5. 点击“开始推理”或“仿真推理”。
-
-成功时：
-
-- XWiz 显示推理服务启动成功。
-- 本机日志出现 `inference completed ... action_shape=(100,19)`。
-- PC2 日志出现 `Actions received` 和 `Executed Action Step`。
-- `/mj_sim/control/joint_position` 有约 10 Hz 数据。
-
-检查命令：
-
-```bash
+ros2 topic hz /mj_sim/control/joint_position
+tail -f /home/dexforce/xwiz_real_client.log
 journalctl --user -u xwiz-act-server.service -f
 ```
 
-PC2：
+仿真任务不会创建 `optimized_robot_client` 的真机话题发布器。
+
+## 5. 真机操作
+
+点击前必须确认：机器人周围无人和障碍、物理急停可立即触达、Auto/Tele/ACT/Map均已停止、机器人已处于ACT默认姿势且状态为Idle。
+
+1. 在“模型部署”中选择模型1、任务2 `ACT Popcorn 真机100帧`。
+2. 再次核对任务ID是2，不是1。
+3. 准备好物理急停后，由操作者本人点击“部署”。
+4. “部署”会立即执行安全门禁；通过后开始推理和真机动作，不通过则返回失败且不发布动作。
+5. 一个100帧块执行完后自动停止；需要提前停止时点击“停止推理”。
+
+真机开始门禁包括：20个电机为OP、错误码为零、状态Idle、当前姿势与ACT默认姿势最大误差不超过0.05 rad、头图/双腕黑图/身体和双手反馈齐全、模型输出严格为有限的 `100×19`。
+
+## 6. 停止与检查
+
+软件停止：
 
 ```bash
-tail -f /home/dexforce/xwiz_safe_client.log
-ros2 topic hz /mj_sim/control/joint_position
-```
-
-## 5. 停止仿真推理
-
-优先在 XWiz 中点击“停止推理”。也可以在 PC1 调用：
-
-```bash
-export ROS_DOMAIN_ID=20
-export RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
-source /opt/ros/humble/setup.bash
-source /home/dexforce/w1/install/setup.bash
 ros2 service call /inference/stop_inference std_srvs/srv/Trigger '{}'
 ```
 
-停止后检查：
+紧急情况优先使用物理急停，软件停止不能替代物理急停。
+
+检查是否仍有控制流：
 
 ```bash
-ros2 topic echo --once /inference/status
+timeout 3 ros2 topic echo --once /control/joint_position
+timeout 3 ros2 topic echo --once /control/ee/left
+timeout 3 ros2 topic echo --once /control/ee/right
 ```
 
-应返回 `status: 1` 和 `message: ok`。
+空闲时三个命令都应超时且无消息。话题可能仍显示基础节点或XWiz的发布端点；存在端点不等于正在发送控制命令。
 
-## 6. 安全检查
+## 7. 配置位置与日志
 
-仿真客户端只能出现在 `/mj_sim/control/*`：
-
-```bash
-ros2 topic info -v /mj_sim/control/joint_position
-ros2 topic info -v /control/joint_position
-```
-
-预期结果：
-
-- `/mj_sim/control/joint_position` 的发布者为 `optimized_robot_client`。
-- 真实 `/control/joint_position` 不能新增 `optimized_robot_client`。
-- 真实话题可能存在基础界面的 `fastapi_bridge_node`，它不是本次仿真客户端。
-
-PC2 安全包装会强制：
+本机XWiz任务：
 
 ```text
-mode=1
-home_position=""
-chunk_size_threshold=0.0
+~/.dexforce/XWiz/model_deployments/tasks/1/task_config.json  # 仿真
+~/.dexforce/XWiz/model_deployments/tasks/2/task_config.json  # 真机100帧
 ```
 
-因此本流程不会执行复位动作，也不会把 ACT 动作发布到真机控制话题。
-
-## 7. 常见故障
-
-### 启动调用推理复位超时
-
-依次检查：
+PC1任务副本：
 
 ```text
-本机 8889 -> PC2 8890 -> PC1 inference_manager -> XWiz ROS 服务
+/home/dexforce/workspace/.dexforce/XWiz/model_deployments/tasks/1/task_config.json
+/home/dexforce/workspace/.dexforce/XWiz/model_deployments/tasks/2/task_config.json
 ```
 
-### 提示头部相机没有数据
+日志：
 
-```bash
-ros2 topic hz /camera/left_eye_resize
-ros2 topic hz /camera/right_eye_resize
-tail -100 /home/dexforce/kfc_camera.log
+```text
+本机：journalctl --user -u xwiz-act-server.service
+PC1：/home/dexforce/xwiz_real_manager.log
+PC2：/home/dexforce/xwiz_real_client.log
+PC2：/home/dexforce/xwiz_black_wrist.log
 ```
 
-### 腕部相机没有数据
-
-```bash
-pgrep -af black_wrist_images.py
-ros2 topic echo --once /camera_l/color/image_rect_raw
-ros2 topic echo --once /camera_r/color/image_rect_raw
-```
-
-黑图的正确规格是 `640x360`、`bgr8`、像素全部为 0。
-
-### 本机模型服务失败
-
-```bash
-systemctl --user restart xwiz-act-server.service
-journalctl --user -u xwiz-act-server.service -n 100 --no-pager
-```
-
-不要同时手工运行 `start_local.sh` 和 systemd 服务，否则会发生 8889 端口冲突。
+如果XWiz未显示新任务，退出“模型部署”页面后重新进入；仍未刷新时重启XWiz图形界面，但不要重复启动后台三端服务。

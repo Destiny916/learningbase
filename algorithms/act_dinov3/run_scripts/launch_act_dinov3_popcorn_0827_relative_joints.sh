@@ -4,14 +4,14 @@ set -euo pipefail
 # Popcorn W1: 19D state/action. Joint dimensions are relative; grippers stay absolute.
 DATA_ROOT="${DATA_ROOT:-/data/wengyikun/datasets/popcorn/0827_lerobot_v30_action_nextstate}"
 STATS_ROOT="${STATS_ROOT:-/data/wengyikun/act_stats/popcorn_0827_19d_relative_arm_joints_absolute_waist_neck_grippers_chunk16}"
-OUTPUT_DIR="${OUTPUT_DIR:-/data/wengyikun/outputs/act_dinov3_popcorn_0827_19d_relative_arm_joints_chunk16_b64_500k_gpu1_2/train_out}"
+OUTPUT_DIR="${OUTPUT_DIR:-/data/wengyikun/outputs/act_dinov3_popcorn_0827_19d_relative_arm_joints_nextstate_chunk16_b64_500k_gpu1_2/train_out}"
 STEPS="${STEPS:-500000}"
 SAVE_FREQ="${SAVE_FREQ:-50000}"
 BATCH_SIZE="${BATCH_SIZE:-32}"
 NUM_WORKERS="${NUM_WORKERS:-16}"
 WARMUP_STEPS="${WARMUP_STEPS:-25000}"
 DECAY_STEPS="${DECAY_STEPS:-500000}"
-JOB_NAME="${JOB_NAME:-act_dinov3_popcorn_0827_19d_relative_arm_joints_chunk16_b64_500k_gpu1_2}"
+JOB_NAME="${JOB_NAME:-act_dinov3_popcorn_0827_19d_relative_arm_joints_nextstate_chunk16_b64_500k_gpu1_2}"
 NUM_PROCESSES="${NUM_PROCESSES:-2}"
 
 STATE_NAMES='["WAIST","LEFT_J1","LEFT_J2","LEFT_J3","LEFT_J4","LEFT_J5","LEFT_J6","LEFT_J7","NECK1","NECK2","RIGHT_J1","RIGHT_J2","RIGHT_J3","RIGHT_J4","RIGHT_J5","RIGHT_J6","RIGHT_J7","LEFT_GRIPPER","RIGHT_GRIPPER"]'

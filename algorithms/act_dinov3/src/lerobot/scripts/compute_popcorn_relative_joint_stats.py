@@ -15,7 +15,9 @@ import pyarrow.parquet as pq
 import torch
 
 from lerobot.datasets.relative_joint_stats import (
-    compute_relative_joint_stats_from_episodes,
+    QuantileStats,
+    RelativeJointStatsBundle,
+    _quantile_stats,
     save_relative_joint_stats,
 )
 
@@ -82,21 +84,34 @@ def main() -> None:
         sys.executable, "-m", "lerobot.scripts.compute_popcorn_relative_joint_stats",
         f"--dataset-root={root}", f"--output-dir={args.output_dir.resolve()}", f"--horizon={args.horizon}",
     ])
-    stats = compute_relative_joint_stats_from_episodes(
-        episodes,
-        gripper_indices=[17, 18],
-        horizons=[args.horizon],
+    state_absolute = [0, 8, 9, 17, 18]
+    action_absolute = [0, 8, 9, 17, 18]
+    state_relative = []
+    action_relative = []
+    for state_episode, action_episode in zip(episodes, action_episodes, strict=True):
+        state_array = state_episode.numpy().astype(np.float64)
+        action_array = action_episode.numpy().astype(np.float64)
+        state_delta = state_array.copy()
+        relative_indices = [index for index in range(19) if index not in state_absolute]
+        state_delta[0, relative_indices] = 0.0
+        state_delta[1:, relative_indices] = state_array[1:, relative_indices] - state_array[:-1, relative_indices]
+        state_relative.append(state_delta)
+        for start in range(len(state_array)):
+            for offset in range(min(args.horizon, len(state_array) - start)):
+                target = action_array[start + offset].copy()
+                target[relative_indices] -= state_array[start, relative_indices]
+                action_relative.append(target)
+    stats = RelativeJointStatsBundle(
+        state=_quantile_stats(np.concatenate(state_relative, axis=0)),
+        actions={args.horizon: _quantile_stats(np.stack(action_relative))},
         feature_names=action_names,
-        state_feature_names=state_names,
-        action_feature_names=action_names,
-        state_gripper_indices=[17, 18],
-        action_gripper_indices=[17, 18],
-        action_state_indices=list(range(19)),
-        action_episodes=action_episodes,
-        state_absolute_indices=[0, 8, 9, 17, 18],
-        action_absolute_indices=[0, 8, 9, 17, 18],
+        gripper_indices=[17, 18],
         source_manifest_sha256=source_sha,
         source_dataset_root=str(root),
+        state_feature_names=state_names,
+        state_gripper_indices=[17, 18],
+        state_absolute_indices=state_absolute,
+        action_absolute_indices=action_absolute,
     )
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "full_dataset_manifest.json").write_bytes(manifest_bytes)

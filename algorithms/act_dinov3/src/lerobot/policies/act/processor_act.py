@@ -126,6 +126,7 @@ def make_act_pre_post_processors(
             action_feature_names=config.action_feature_names,
             state_gripper_indices=config.state_gripper_indices,
             state_absolute_indices=config.state_absolute_indices,
+            action_absolute_indices=config.action_absolute_indices,
             action_gripper_indices=config.gripper_indices,
         )
         input_steps = [

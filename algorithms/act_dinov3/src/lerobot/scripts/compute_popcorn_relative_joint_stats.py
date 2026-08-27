@@ -92,7 +92,8 @@ def main() -> None:
         action_gripper_indices=[17, 18],
         action_state_indices=list(range(19)),
         action_episodes=action_episodes,
-        state_absolute_indices=[17, 18],
+        state_absolute_indices=[0, 8, 9, 17, 18],
+        action_absolute_indices=[0, 8, 9, 17, 18],
         source_manifest_sha256=source_sha,
         source_dataset_root=str(root),
     )

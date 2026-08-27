@@ -73,6 +73,7 @@ class RelativeJointStatsBundle:
     state_feature_names: list[str] | None = None
     state_gripper_indices: list[int] | None = None
     state_absolute_indices: list[int] | None = None
+    action_absolute_indices: list[int] | None = None
 
     def __post_init__(self) -> None:
         state_dimension = self.state.q01.shape[0]
@@ -82,6 +83,7 @@ class RelativeJointStatsBundle:
         state_feature_names = list(self.state_feature_names or feature_names)
         state_gripper_indices = list(self.state_gripper_indices or gripper_indices)
         state_absolute_indices = list(self.state_absolute_indices or [])
+        action_absolute_indices = list(self.action_absolute_indices or [])
         actions = dict(self.actions)
         if len(feature_names) != action_dimension or any(
             not isinstance(name, str) or not name for name in feature_names
@@ -100,6 +102,7 @@ class RelativeJointStatsBundle:
         _validate_gripper_indices(gripper_indices, action_dimension)
         _validate_gripper_indices(state_gripper_indices, state_dimension)
         _validate_indices(state_absolute_indices, state_dimension, "state absolute indices")
+        _validate_indices(action_absolute_indices, action_dimension, "action absolute indices")
         if not actions:
             raise ValueError("actions must contain at least one horizon")
         for horizon, stats in actions.items():
@@ -122,6 +125,7 @@ class RelativeJointStatsBundle:
         object.__setattr__(self, "state_feature_names", state_feature_names)
         object.__setattr__(self, "state_gripper_indices", state_gripper_indices)
         object.__setattr__(self, "state_absolute_indices", state_absolute_indices)
+        object.__setattr__(self, "action_absolute_indices", action_absolute_indices)
         object.__setattr__(self, "actions", actions)
 
     @property
@@ -187,6 +191,7 @@ def compute_relative_joint_stats_from_episodes(
     action_gripper_indices: Sequence[int] | None = None,
     action_state_indices: Sequence[int] | None = None,
     state_absolute_indices: Sequence[int] | None = None,
+    action_absolute_indices: Sequence[int] | None = None,
 ) -> RelativeJointStatsBundle:
     """Compute exact train-only relative state and action quantiles.
 
@@ -215,7 +220,9 @@ def compute_relative_joint_stats_from_episodes(
     state_grippers = list(state_gripper_indices if state_gripper_indices is not None else gripper_indices or [])
     _validate_gripper_indices(state_grippers, state_dimension)
     state_absolute = list(state_absolute_indices or [])
+    action_absolute = list(action_absolute_indices or [])
     _validate_indices(state_absolute, state_dimension, "state absolute indices")
+    _validate_indices(action_absolute, action_dimension, "action absolute indices")
     episode_arrays = [_as_episode_array(episode, index, state_dimension) for index, episode in enumerate(episodes)]
 
     if action_feature_names is None:
@@ -275,7 +282,8 @@ def compute_relative_joint_stats_from_episodes(
         for state_episode, action_episode in zip(episode_arrays, action_arrays, strict=True):
             for offset in range(1, min(horizon, len(state_episode) - 1) + 1):
                 target = action_episode[offset:].copy()
-                action_arm_indices = [index for index in range(action_dimension) if index not in action_grippers]
+                action_non_relative = set(action_grippers) | set(action_absolute)
+                action_arm_indices = [index for index in range(action_dimension) if index not in action_non_relative]
                 target[:, action_arm_indices] = (
                     action_episode[offset:, action_arm_indices]
                     - state_episode[:-offset, np.asarray(action_to_state)[action_arm_indices]]
@@ -295,6 +303,7 @@ def compute_relative_joint_stats_from_episodes(
         state_feature_names=state_names,
         state_gripper_indices=state_grippers,
         state_absolute_indices=state_absolute,
+        action_absolute_indices=action_absolute,
     )
 
 
@@ -348,18 +357,21 @@ def save_relative_joint_stats(
         bundle.state_feature_names == bundle.feature_names
         and bundle.state_gripper_indices == bundle.gripper_indices
         and not bundle.state_absolute_indices
+        and not bundle.action_absolute_indices
     )
+    format_version = 4 if bundle.action_absolute_indices else (1 if is_legacy else (3 if bundle.state_absolute_indices else 2))
     manifest = {
-        "format_version": 1 if is_legacy else (3 if bundle.state_absolute_indices else 2),
+        "format_version": format_version,
         "formula_version": "relative_joint_v1"
         if is_legacy
-        else ("relative_joint_v3" if bundle.state_absolute_indices else "relative_joint_v2"),
+        else ("relative_joint_v4" if bundle.action_absolute_indices else ("relative_joint_v3" if bundle.state_absolute_indices else "relative_joint_v2")),
         "generation_command": generation_command,
         "feature_names": bundle.feature_names,
         "gripper_indices": bundle.gripper_indices,
         "state_feature_names": bundle.state_feature_names,
         "state_gripper_indices": bundle.state_gripper_indices,
         "state_absolute_indices": bundle.state_absolute_indices,
+        "action_absolute_indices": bundle.action_absolute_indices,
         "source_manifest_sha256": bundle.source_manifest_sha256,
         "source_dataset_root": bundle.source_dataset_root,
         "state_file": STATE_STATS_FILENAME,
@@ -401,12 +413,13 @@ def load_relative_joint_stats(
     output_dir = Path(output_dir)
     manifest_path = output_dir / MANIFEST_FILENAME
     manifest = _load_json(manifest_path)
-    if manifest.get("format_version") not in {1, 2, 3}:
-        raise ValueError("relative stats manifest must have format_version 1, 2, or 3")
+    if manifest.get("format_version") not in {1, 2, 3, 4}:
+        raise ValueError("relative stats manifest must have format_version 1, 2, 3, or 4")
     expected_formula = {
         1: "relative_joint_v1",
         2: "relative_joint_v2",
         3: "relative_joint_v3",
+        4: "relative_joint_v4",
     }[manifest.get("format_version")]
     if manifest.get("formula_version") != expected_formula:
         raise ValueError(f"relative stats manifest must have formula_version {expected_formula}")
@@ -415,6 +428,7 @@ def load_relative_joint_stats(
     state_feature_names = manifest.get("state_feature_names", feature_names)
     state_gripper_indices = manifest.get("state_gripper_indices", gripper_indices)
     state_absolute_indices = manifest.get("state_absolute_indices", [])
+    action_absolute_indices = manifest.get("action_absolute_indices", [])
     source_sha256 = manifest.get("source_manifest_sha256")
     source_dataset_root = manifest.get("source_dataset_root")
     if feature_names != list(expected_feature_names):
@@ -469,6 +483,7 @@ def load_relative_joint_stats(
         state_feature_names=state_feature_names,
         state_gripper_indices=state_gripper_indices,
         state_absolute_indices=state_absolute_indices,
+        action_absolute_indices=action_absolute_indices,
     )
 
 

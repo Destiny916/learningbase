@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Popcorn W1: 19D state/action. Joint dimensions are relative; grippers stay absolute.
-DATA_ROOT="${DATA_ROOT:-/data/wengyikun/datasets/popcorn/0827_lerobot_v30}"
-STATS_ROOT="${STATS_ROOT:-/data/wengyikun/act_stats/popcorn_0827_19d_relative_joints_absolute_grippers_chunk16}"
+DATA_ROOT="${DATA_ROOT:-/data/wengyikun/datasets/popcorn/0827_lerobot_v30_action_nextstate}"
+STATS_ROOT="${STATS_ROOT:-/data/wengyikun/act_stats/popcorn_0827_19d_relative_arm_joints_absolute_waist_neck_grippers_chunk16}"
 OUTPUT_DIR="${OUTPUT_DIR:-/data/wengyikun/outputs/act_dinov3_popcorn_0827_19d_relative_joints_chunk16_b32_500k_gpu4/train_out}"
 STEPS="${STEPS:-500000}"
 SAVE_FREQ="${SAVE_FREQ:-50000}"
@@ -55,7 +55,8 @@ assert manifest["format_version"] == 3
 assert manifest["horizons"] == [16]
 assert manifest["gripper_indices"] == [17, 18]
 assert manifest["state_gripper_indices"] == [17, 18]
-assert manifest["state_absolute_indices"] == [17, 18]
+assert manifest["state_absolute_indices"] == [0, 8, 9, 17, 18]
+assert manifest["action_absolute_indices"] == [0, 8, 9, 17, 18]
 assert manifest["source_dataset_root"] == str(root.resolve())
 for name in ("relative_state_q01_q99.json", "relative_action_chunk16_q01_q99.json"):
     payload = json.loads((stats / name).read_text())
@@ -81,7 +82,8 @@ exec accelerate launch --num_processes=1 --mixed_precision=bf16 \
   --policy.joint_representation=relative \
   --policy.gripper_indices='[17,18]' \
   --policy.state_gripper_indices='[17,18]' \
-  --policy.state_absolute_indices='[17,18]' \
+  --policy.state_absolute_indices='[0,8,9,17,18]' \
+  --policy.action_absolute_indices='[0,8,9,17,18]' \
   --policy.state_feature_names="$STATE_NAMES" \
   --policy.action_feature_names="$STATE_NAMES" \
   --policy.condition_on_state=true \

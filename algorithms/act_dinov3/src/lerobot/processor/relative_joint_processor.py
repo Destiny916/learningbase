@@ -71,6 +71,7 @@ class RelativeJointProcessorStep(ProcessorStep):
     action_feature_names: list[str] | None = None
     state_gripper_indices: list[int] | None = None
     state_absolute_indices: list[int] = field(default_factory=list)
+    action_absolute_indices: list[int] = field(default_factory=list)
     action_gripper_indices: list[int] | None = None
     action_state_indices: list[int] | None = None
     _last_observation_state: torch.Tensor | None = field(default=None, init=False, repr=False)
@@ -81,6 +82,7 @@ class RelativeJointProcessorStep(ProcessorStep):
     _state_grippers: list[int] = field(default_factory=list, init=False, repr=False)
     _state_absolute: list[int] = field(default_factory=list, init=False, repr=False)
     _action_grippers: list[int] = field(default_factory=list, init=False, repr=False)
+    _action_absolute: list[int] = field(default_factory=list, init=False, repr=False)
     _action_to_state: list[int] = field(default_factory=list, init=False, repr=False)
 
     def __post_init__(self) -> None:
@@ -95,6 +97,7 @@ class RelativeJointProcessorStep(ProcessorStep):
         action_names = list(self.action_feature_names or self.joint_names)
         state_grippers = list(self.state_gripper_indices if self.state_gripper_indices is not None else self.gripper_indices)
         state_absolute = list(self.state_absolute_indices)
+        action_absolute = list(self.action_absolute_indices)
         action_grippers = list(self.action_gripper_indices if self.action_gripper_indices is not None else self.gripper_indices)
         _validate_joint_names(state_names, state_grippers)
         _validate_joint_names(action_names, action_grippers)
@@ -103,6 +106,11 @@ class RelativeJointProcessorStep(ProcessorStep):
             for index in state_absolute
         ):
             raise ValueError("state_absolute_indices must contain unique valid state indices")
+        if len(set(action_absolute)) != len(action_absolute) or any(
+            not isinstance(index, int) or isinstance(index, bool) or index < 0 or index >= len(action_names)
+            for index in action_absolute
+        ):
+            raise ValueError("action_absolute_indices must contain unique valid action indices")
         state_name_to_index = {name: index for index, name in enumerate(state_names)}
         if self.action_state_indices is None:
             try:
@@ -121,6 +129,7 @@ class RelativeJointProcessorStep(ProcessorStep):
         self._action_names = action_names
         self._state_grippers = state_grippers
         self._state_absolute = state_absolute
+        self._action_absolute = action_absolute
         self._action_grippers = action_grippers
         self._action_to_state = action_to_state
         if isinstance(self.execution_horizon, bool) or not isinstance(self.execution_horizon, int):
@@ -259,6 +268,8 @@ class RelativeJointProcessorStep(ProcessorStep):
     def _action_arm_mask(self, device: torch.device) -> torch.Tensor:
         mask = torch.ones(len(self._action_names), device=device, dtype=torch.bool)
         mask[self._action_grippers] = False
+        if self._action_absolute:
+            mask[self._action_absolute] = False
         return mask
 
     def _arm_mask(self, device: torch.device) -> torch.Tensor:
@@ -294,6 +305,7 @@ class RelativeJointProcessorStep(ProcessorStep):
                     "action_feature_names": self._action_names,
                     "state_gripper_indices": self._state_grippers,
                     "state_absolute_indices": self._state_absolute,
+                    "action_absolute_indices": self._action_absolute,
                     "action_gripper_indices": self._action_grippers,
                     "action_state_indices": self._action_to_state,
                 }
@@ -401,7 +413,11 @@ class RelativeJointAbsoluteActionProcessorStep(ProcessorStep):
             raise ValueError("cached absolute observation.state shape does not match action batch dimensions")
 
         absolute_action = action.clone()
-        arm_mask = self.relative_step._action_arm_mask(action.device)
+        # The cached absolute anchor is captured before the device processor,
+        # while the policy action is normally on the policy device.  Build the
+        # boolean mask on the anchor device before indexing it, then move the
+        # selected reference to the action device.
+        arm_mask = self.relative_step._action_arm_mask(current.device)
         mapped_current = current[..., self.relative_step._action_to_state]
         reference = mapped_current[..., arm_mask].to(device=action.device, dtype=action.dtype)
         if action.ndim == current.ndim + 1:

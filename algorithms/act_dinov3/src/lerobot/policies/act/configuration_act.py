@@ -99,6 +99,7 @@ class ACTConfig(PreTrainedConfig):
     state_feature_names: list[str] | None = None
     state_gripper_indices: list[int] | None = None
     state_absolute_indices: list[int] = field(default_factory=list)
+    action_absolute_indices: list[int] = field(default_factory=list)
     action_feature_names: list[str] | None = None
     relative_state_stats_path: str | None = None
     relative_action_stats_path: str | None = None

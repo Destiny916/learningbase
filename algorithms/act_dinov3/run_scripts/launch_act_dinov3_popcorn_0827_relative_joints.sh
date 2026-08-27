@@ -40,12 +40,10 @@ PY
 
 if [[ ! -f "$STATS_ROOT/relative_stats_manifest.json" || ! -f "$STATS_ROOT/relative_state_q01_q99.json" || ! -f "$STATS_ROOT/relative_action_chunk16_q01_q99.json" ]]; then
   mkdir -p "$STATS_ROOT"
-  python3 -m lerobot.scripts.compute_full_dataset_relative_joint_stats \
+  python3 -m lerobot.scripts.compute_popcorn_relative_joint_stats \
     --dataset-root="$DATA_ROOT" \
     --output-dir="$STATS_ROOT" \
-    --horizons='[16]' \
-    --gripper-indices='[17,18]' \
-    --state-absolute-indices='[17,18]'
+    --horizon=16
 fi
 
 python3 - "$DATA_ROOT" "$STATS_ROOT" <<'PY'

@@ -95,7 +95,6 @@ exec accelerate launch --num_processes="$NUM_PROCESSES" --multi_gpu --mixed_prec
   --policy.gripper_noise_std_m=0 \
   --policy.chunk_size=16 --policy.n_action_steps=16 \
   --policy.dropout=0.1 \
-  --policy.gradient_checkpointing=true \
   --batch_size="$BATCH_SIZE" --gradient_accumulation_steps=1 --num_workers="$NUM_WORKERS" \
   --optimizer.type=adamw --optimizer.lr=1e-5 --optimizer.weight_decay=1e-4 --optimizer.grad_clip_norm=10 \
   --scheduler.type=cosine_decay_with_warmup --scheduler.num_warmup_steps="$WARMUP_STEPS" --scheduler.num_decay_steps="$DECAY_STEPS" --scheduler.peak_lr=1e-5 --scheduler.decay_lr=1e-6 \

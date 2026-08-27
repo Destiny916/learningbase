@@ -63,7 +63,7 @@ for name in ("relative_state_q01_q99.json", "relative_action_chunk16_q01_q99.jso
     payload = json.loads((stats / name).read_text())
     assert len(payload["q01"]) == 19 and len(payload["q99"]) == 19
     assert all(a <= b for a, b in zip(payload["q01"], payload["q99"]))
-print("relative stats preflight OK: state/action independent q01-q99, D=19, joints=0..16 relative, grippers=17..18 absolute")
+print("relative stats preflight OK: state/action independent q01-q99, D=19, relative arm joints=[1..7,10..16], absolute=[0,8,9,17,18]")
 PY
 
 export PYTHONPATH="${PYTHONPATH:-/data/wengyikun/popcorn/algorithms/act_dinov3/src}"
@@ -96,6 +96,7 @@ exec accelerate launch --num_processes="$NUM_PROCESSES" --multi_gpu --mixed_prec
   --policy.chunk_size=16 --policy.n_action_steps=16 \
   --policy.dropout=0.1 \
   --batch_size="$BATCH_SIZE" --gradient_accumulation_steps=1 --num_workers="$NUM_WORKERS" \
+  --use_policy_training_preset=false \
   --optimizer.type=adamw --optimizer.lr=1e-5 --optimizer.weight_decay=1e-4 --optimizer.grad_clip_norm=10 \
   --scheduler.type=cosine_decay_with_warmup --scheduler.num_warmup_steps="$WARMUP_STEPS" --scheduler.num_decay_steps="$DECAY_STEPS" --scheduler.peak_lr=1e-5 --scheduler.decay_lr=1e-6 \
   --steps="$STEPS" --save_checkpoint=true --save_freq="$SAVE_FREQ" --log_freq=10 \

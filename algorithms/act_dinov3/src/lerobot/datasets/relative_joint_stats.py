@@ -222,7 +222,6 @@ def compute_relative_joint_stats_from_episodes(
     state_absolute = list(state_absolute_indices or [])
     action_absolute = list(action_absolute_indices or [])
     _validate_indices(state_absolute, state_dimension, "state absolute indices")
-    _validate_indices(action_absolute, action_dimension, "action absolute indices")
     episode_arrays = [_as_episode_array(episode, index, state_dimension) for index, episode in enumerate(episodes)]
 
     if action_feature_names is None:
@@ -231,6 +230,8 @@ def compute_relative_joint_stats_from_episodes(
         action_names = list(action_feature_names)
     if not action_names:
         raise ValueError("action feature names must not be empty")
+    action_dimension = len(action_names)
+    _validate_indices(action_absolute, action_dimension, "action absolute indices")
     if len(set(action_names)) != len(action_names) or any(not isinstance(name, str) or not name for name in action_names):
         raise ValueError("action feature names must be unique nonempty strings")
     state_name_to_index = {name: index for index, name in enumerate(state_names)}

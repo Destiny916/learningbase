@@ -101,7 +101,7 @@ def main() -> None:
     args.output_dir.mkdir(parents=True, exist_ok=True)
     (args.output_dir / "full_dataset_manifest.json").write_bytes(manifest_bytes)
     save_relative_joint_stats(stats, args.output_dir, generation_command=command)
-    print(f"POPCORN_RELATIVE_STATS_OK episodes={len(episodes)} frames={sum(len(ep) for ep in episodes)} action_contract=action[t]==state[t] source_manifest_sha256={source_sha}")
+    print(f"POPCORN_RELATIVE_STATS_OK episodes={len(episodes)} frames={sum(len(ep) for ep in episodes)} action_contract=action[t]==state[t+1] for non-tail frames source_manifest_sha256={source_sha}")
 
 
 if __name__ == "__main__":

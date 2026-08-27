@@ -53,8 +53,6 @@ def main() -> None:
                 raise ValueError(f"unexpected state/action shape in {parquet_path}")
             if not np.all(np.isfinite(state_array)) or not np.all(np.isfinite(action_array)):
                 raise ValueError(f"non-finite values in {parquet_path}")
-            if not np.allclose(action_array, state_array, rtol=1e-5, atol=1e-6):
-                raise ValueError("Popcorn action contract violated: expected action[t] == state[t]")
             grouped.setdefault(int(episode), []).append((int(frame), state_array, action_array))
 
     episodes = []
@@ -64,6 +62,9 @@ def main() -> None:
         frame_indices = [row[0] for row in rows]
         if frame_indices != list(range(len(rows))):
             raise ValueError(f"episode {episode_index} frame indices are not contiguous")
+        for row_index in range(len(rows) - 1):
+            if not np.allclose(rows[row_index][2], rows[row_index + 1][1], rtol=1e-5, atol=1e-6):
+                raise ValueError(f"Popcorn action contract violated in episode {episode_index}: expected action[t] == state[t+1]")
         episodes.append(torch.from_numpy(np.stack([row[1] for row in rows])))
         action_episodes.append(torch.from_numpy(np.stack([row[2] for row in rows])))
 

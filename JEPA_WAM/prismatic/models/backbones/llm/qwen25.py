@@ -32,7 +32,9 @@ class Qwen25LLMBackbone(HFCausalLLMBackbone):
         llm_path: Optional[str] = None,
         hf_token: Optional[str] = None,
         inference_mode: bool = False,
-        use_flash_attention_2: bool = True,
+        # FlashAttention is optional; the reproducible Docker image uses
+        # PyTorch SDPA unless explicitly enabled by the caller.
+        use_flash_attention_2: bool = False,
         num_extra_tokens: int = 0,
     ) -> None:
         super().__init__(

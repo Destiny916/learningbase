@@ -6,7 +6,7 @@ DATA_ROOT="${DATA_ROOT:-/data/wengyikun/datasets/popcorn/0827_lerobot_v30_action
 STATS_ROOT="${STATS_ROOT:-/data/wengyikun/act_stats/popcorn_0827_19d_relative_arm_joints_absolute_waist_neck_grippers_chunk16}"
 OUTPUT_DIR="${OUTPUT_DIR:-/data/wengyikun/outputs/act_dinov3_popcorn_0827_19d_relative_arm_joints_nextstate_chunk16_b64_500k_gpu1_2/train_out}"
 STEPS="${STEPS:-500000}"
-SAVE_FREQ="${SAVE_FREQ:-50000}"
+SAVE_FREQ="${SAVE_FREQ:-20000}"
 BATCH_SIZE="${BATCH_SIZE:-32}"
 NUM_WORKERS="${NUM_WORKERS:-16}"
 WARMUP_STEPS="${WARMUP_STEPS:-25000}"
@@ -80,6 +80,7 @@ exec accelerate launch --num_processes="$NUM_PROCESSES" --multi_gpu --mixed_prec
   --policy.dinov3_pretrained_path=/data/wengyikun/models/turbovla_joint_songling/dinov3-vitl16-pretrain-lvd1689m \
   --policy.dinov3_gradient_checkpointing=true \
   --policy.dinov3_autocast_dtype=bfloat16 \
+  --policy.dinov3_apply_image_normalization=true \
   --policy.joint_representation=relative \
   --policy.gripper_indices='[17,18]' \
   --policy.state_gripper_indices='[17,18]' \
@@ -96,9 +97,9 @@ exec accelerate launch --num_processes="$NUM_PROCESSES" --multi_gpu --mixed_prec
   --policy.chunk_size=16 --policy.n_action_steps=16 \
   --policy.dropout=0.1 \
   --batch_size="$BATCH_SIZE" --gradient_accumulation_steps=1 --num_workers="$NUM_WORKERS" \
-  --use_policy_training_preset=false \
-  --optimizer.type=adamw --optimizer.lr=1e-5 --optimizer.weight_decay=1e-4 --optimizer.grad_clip_norm=10 \
-  --scheduler.type=cosine_decay_with_warmup --scheduler.num_warmup_steps="$WARMUP_STEPS" --scheduler.num_decay_steps="$DECAY_STEPS" --scheduler.peak_lr=1e-5 --scheduler.decay_lr=1e-6 \
+  --use_policy_training_preset=true \
+  --policy.optimizer_lr=1e-5 --policy.optimizer_weight_decay=1e-4 --policy.dinov3_learning_rate=1e-6 \
+  --policy.scheduler_warmup_steps="$WARMUP_STEPS" --policy.scheduler_decay_steps="$DECAY_STEPS" --policy.scheduler_decay_lr=1e-6 \
   --steps="$STEPS" --save_checkpoint=true --save_freq="$SAVE_FREQ" --log_freq=10 \
   --eval_steps=0 --wandb.enable=false \
   --output_dir="$OUTPUT_DIR" --job_name="$JOB_NAME"

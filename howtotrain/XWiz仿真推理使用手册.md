@@ -1,17 +1,19 @@
-# XWiz 仿真与真机推理使用手册
+# XWiz 仿真推理使用手册
+
+> 范围：本手册只用于 XWiz 仿真推理，不提供 XWiz 真机推理步骤。
 
 ## 1. 当前交互规则
 
-XWiz 原厂“部署”按钮会下发配置并立即启动推理，不需要再点一次“开始推理”。当前用两个任务隔离模式：
+XWiz 原厂“部署”按钮会下发配置并立即启动推理，不需要再点一次“开始推理”。
+本手册只使用模型 1 + 任务 1 `ACT Popcorn 仿真100帧`：
 
-| XWiz选择 | 模式 | 输出位置 | 点击“部署”后的行为 |
-|---|---|---|---|
-| 模型1 + 任务1 | 仿真 | `/mj_sim/control/*` | 立即推理并执行100帧仿真动作 |
-| 模型1 + 任务2 | 真机 | `/control/joint_position`、`/control/ee/left`、`/control/ee/right` | 安全检查通过后立即推理并执行一个100帧动作块 |
+| XWiz 选择 | 输出位置 | 点击“部署”后的行为 |
+|---|---|---|
+| 模型1 + 任务1 | `/mj_sim/control/*` | 立即推理并执行100帧仿真动作 |
 
-两个任务都固定为 `action_horizon=100`、`max_steps=100`、`sample_factor=1`、`chunk_size_threshold=0`、`home_position=""`。真机任务不会自动复位；机器人必须事先位于 ACT 默认姿势。
-
-真机动作是 `100×19` 绝对目标：17维身体关节加左右夹爪开合度。夹爪标量 `0=完全闭合`、`100=完全张开`，运行时转换为左右 Linker L6 的6维手指命令。控制频率10 Hz，一个动作块约10秒，第100帧后自动停止。
+仿真任务固定为 `action_horizon=100`、`sample_factor=1`、`chunk_size_threshold=0`、
+`home_position=""`、`mode=1`。PC2 安全包装器会再次强制 `mode=1` 和空 `home_position`，
+并禁用 ActionLiPo，防止仿真任务改写到真机控制输出。
 
 ## 2. 三端结构
 
@@ -24,13 +26,14 @@ PC1 192.168.20.20
   xwiz_real_runtime.manager_service
                  |
 PC2 192.168.20.21
-  xwiz_real_runtime.client_service :8890
-  xwiz_real_runtime.black_wrist_images
+  xwiz_safe_runtime.safe_client_service :8890
+  xwiz_safe_runtime.black_wrist_images
 ```
 
 模型目录：`/home/wengyikun/workplace/popcorn/act_popcorn_45w`。
 
-PC1/PC2运行代码：`/home/dexforce/w1/w1_act/xwiz_real_runtime/`。
+PC1 管理器：`/home/dexforce/w1/w1_act/xwiz_real_runtime/`。
+PC2 仿真安全包装器：`/home/dexforce/w1/w1_act/xwiz_safe_runtime/`。
 
 ## 3. 全部重启后的启动顺序
 
@@ -78,7 +81,7 @@ nohup ros2 launch dexe_sensors_launch kfc_nodes.launch.py \
   > /home/dexforce/kfc_camera.log 2>&1 < /dev/null &
 ```
 
-### 3.3 PC2：腕部黑图与双模式客户端
+### 3.3 PC2：腕部临时黑图与仿真安全客户端
 
 ```bash
 ssh dexforce@192.168.20.21
@@ -88,18 +91,18 @@ source /opt/ros/humble/setup.bash
 source /home/dexforce/w1/install/setup.bash
 export PYTHONPATH=/home/dexforce/w1/w1_act:${PYTHONPATH}
 
-nohup python3 -m xwiz_real_runtime.black_wrist_images \
+nohup python3 /home/dexforce/w1/w1_act/xwiz_safe_runtime/black_wrist_images.py \
   > /home/dexforce/xwiz_black_wrist.log 2>&1 < /dev/null &
 
-nohup python3 -m xwiz_real_runtime.client_service \
-  --config /home/dexforce/w1/w1_act/xwiz_real_runtime/client_runtime.json \
+nohup python3 /home/dexforce/w1/w1_act/xwiz_safe_runtime/safe_client_service.py \
+  --config /home/dexforce/w1/w1_act/xwiz_safe_runtime/client_simulation.json \
   > /home/dexforce/xwiz_real_client.log 2>&1 < /dev/null &
 ```
 
 检查：
 
 ```bash
-pgrep -af 'xwiz_real_runtime.(black_wrist_images|client_service)'
+pgrep -af 'xwiz_safe_runtime|safe_client_service|black_wrist_images.py'
 ss -ltnp | grep ':8890'
 ros2 topic info /camera_l/color/image_rect_raw
 ros2 topic info /camera_r/color/image_rect_raw
@@ -148,19 +151,7 @@ journalctl --user -u xwiz-act-server.service -f
 
 仿真任务不会创建 `optimized_robot_client` 的真机话题发布器。
 
-## 5. 真机操作
-
-点击前必须确认：机器人周围无人和障碍、物理急停可立即触达、Auto/Tele/ACT/Map均已停止、机器人已处于ACT默认姿势且状态为Idle。
-
-1. 在“模型部署”中选择模型1、任务2 `ACT Popcorn 真机100帧`。
-2. 再次核对任务ID是2，不是1。
-3. 准备好物理急停后，由操作者本人点击“部署”。
-4. “部署”会立即执行安全门禁；通过后开始推理和真机动作，不通过则返回失败且不发布动作。
-5. 一个100帧块执行完后自动停止；需要提前停止时点击“停止推理”。
-
-真机开始门禁包括：20个电机为OP、错误码为零、状态Idle、当前姿势与ACT默认姿势最大误差不超过0.05 rad、头图/双腕黑图/身体和双手反馈齐全、模型输出严格为有限的 `100×19`。
-
-## 6. 停止与检查
+## 5. 停止与检查
 
 软件停止：
 
@@ -170,30 +161,26 @@ ros2 service call /inference/stop_inference std_srvs/srv/Trigger '{}'
 
 紧急情况优先使用物理急停，软件停止不能替代物理急停。
 
-检查是否仍有控制流：
+检查仿真输出是否停止：
 
 ```bash
-timeout 3 ros2 topic echo --once /control/joint_position
-timeout 3 ros2 topic echo --once /control/ee/left
-timeout 3 ros2 topic echo --once /control/ee/right
+timeout 3 ros2 topic echo --once /mj_sim/control/joint_position
 ```
 
-空闲时三个命令都应超时且无消息。话题可能仍显示基础节点或XWiz的发布端点；存在端点不等于正在发送控制命令。
+空闲时应超时且无消息。话题可能仍显示发布端点；存在端点不等于正在发送仿真命令。
 
-## 7. 配置位置与日志
+## 6. 配置位置与日志
 
 本机XWiz任务：
 
 ```text
 ~/.dexforce/XWiz/model_deployments/tasks/1/task_config.json  # 仿真
-~/.dexforce/XWiz/model_deployments/tasks/2/task_config.json  # 真机100帧
 ```
 
 PC1任务副本：
 
 ```text
 /home/dexforce/workspace/.dexforce/XWiz/model_deployments/tasks/1/task_config.json
-/home/dexforce/workspace/.dexforce/XWiz/model_deployments/tasks/2/task_config.json
 ```
 
 日志：

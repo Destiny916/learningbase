@@ -118,8 +118,9 @@ class CosineDecayWithWarmupSchedulerConfig(LRSchedulerConfig):
                 return (1 / (actual_warmup_steps + 1) - 1) * frac + 1
 
             def cosine_decay_schedule(current_step):
-                step = min(current_step, actual_decay_steps)
-                cosine_decay = 0.5 * (1 + math.cos(math.pi * step / actual_decay_steps))
+                decay_duration = max(1, actual_decay_steps - actual_warmup_steps)
+                step = min(max(0, current_step - actual_warmup_steps), decay_duration)
+                cosine_decay = 0.5 * (1 + math.cos(math.pi * step / decay_duration))
                 alpha = self.decay_lr / self.peak_lr
                 decayed = (1 - alpha) * cosine_decay + alpha
                 return decayed

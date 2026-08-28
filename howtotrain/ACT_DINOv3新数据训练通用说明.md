@@ -324,19 +324,19 @@ warmup=25000
 cosine decay=500000
 decay lr=1e-6
 steps=500000
-save_freq=50000
+save_freq=20000
 eval_steps=0
 state/gripper noise=0
 BF16 DDP
 ```
 
-显式 optimizer/scheduler 时必须包含：
+当前推荐由 `ACTDINOv3Config` 提供 optimizer/scheduler preset，因此 launcher 应保持：
 
 ```bash
---use_policy_training_preset=false
+--use_policy_training_preset=true
 ```
 
-否则 LeRobot 默认 `use_policy_training_preset=true` 会忽略命令行给出的 scheduler，实际配置可能出现 `scheduler=None`。
+并通过 `policy.optimizer_lr`、`policy.scheduler_warmup_steps`、`policy.scheduler_decay_steps` 和 `policy.scheduler_decay_lr` 设置本任务参数。此路径不会出现 `scheduler=None`，也不需要同时传入通用的 `--optimizer.*` 和 `--scheduler.*`。
 
 ## 7. 双卡 Docker 启动
 
@@ -411,7 +411,7 @@ relative stats preflight OK
 state/action 维度与绝对索引正确
 两个 DDP rank 均加载 415/415 DINOv3 权重
 Effective batch size 与预期一致
-use_policy_training_preset=false
+use_policy_training_preset=true
 scheduler 为 cosine_decay_with_warmup，而不是 None
 step 持续增长
 loss、grad norm 都是 finite
@@ -426,7 +426,9 @@ warmup 阶段 lr 应从低值逐步增加到 1e-5
 500000 步到约 1e-6
 ```
 
-若从第 0 步起一直显示 `lr:1.0e-05`，优先检查是否遗漏 `--use_policy_training_preset=false`。
+以上三项指主网络参数组。DINOv3 参数组始终保持其 10 倍更小的独立学习率，因此对应为约 `4e-11 -> 1e-6 -> 1e-7`。
+
+若从第 0 步起一直显示 `lr:1.0e-05`，检查 launcher 是否确实使用 `ACTDINOv3Config` 的 preset、是否保存了 scheduler 配置，以及日志中的学习率是否来自主网络参数组。主网络应在 warmup 内从约 `4e-10` 增加到 `1e-5`，DINOv3 参数组按相同比例从约 `4e-11` 增加到 `1e-6`。
 
 ## 10. loss 的含义
 
@@ -497,12 +499,12 @@ global step
 
 ### scheduler=None
 
-原因：显式传入 scheduler，但没有关闭 policy preset。
+原因：没有使用 `ACTDINOv3Config` 的 scheduler preset，或启动器没有传入 `policy.scheduler_*` 参数。
 
 修复：
 
 ```bash
---use_policy_training_preset=false
+--use_policy_training_preset=true
 ```
 
 ### action[t] 仍等于 state[t]
@@ -546,6 +548,4 @@ container:
 act_dinov3_popcorn_0827_gpu1_2
 ```
 
-截至本文修订时，该容器仍在 GPU1+GPU2 运行，step 和 finite loss 正常增长。它启动时遗漏了 `--use_policy_training_preset=false`，实际日志从起始阶段一直显示 `lr=1.0e-05`，对应运行配置为 `scheduler=None`，没有执行计划中的 25000-step warmup/cosine decay。
-
-本文和 launcher 已修正未来启动模板，但修改磁盘文件不会改变已运行进程。是否停止并按新 scheduler 重启当前任务，必须单独确认后再操作。
+截至本文修订时，旧的 GPU1+GPU2 ACT-DINOv3 训练已经停止。launcher 已改为使用 `ACTDINOv3Config` 的 optimizer/scheduler preset，并按 25000-step warmup、到 500000 step 完成 cosine decay；当前未启动新训练。

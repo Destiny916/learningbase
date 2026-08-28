@@ -1,5 +1,6 @@
 from types import SimpleNamespace
 
+import pytest
 import torch
 from torch import nn
 
@@ -84,7 +85,10 @@ def test_policy_preserves_camera_order_and_backpropagates_finite_act_loss(tmp_pa
     loss, loss_dict = policy(batch)
     loss.backward()
 
-    assert dino.seen_camera_values == [1.0, 2.0, 3.0]
+    expected_camera_values = [(value - 0.485) / 0.229 for value in (1.0, 2.0, 3.0)]
+    torch.testing.assert_close(
+        torch.tensor(dino.seen_camera_values), torch.tensor(expected_camera_values)
+    )
     assert torch.isfinite(loss)
     assert torch.isfinite(torch.tensor(loss_dict["l1_loss"]))
     assert dino.proj.weight.grad is not None
@@ -106,6 +110,34 @@ def test_policy_optimizer_groups_are_complete_disjoint_and_use_two_learning_rate
     assert groups[1]["lr"] == policy.config.dinov3_learning_rate
     assert len(grouped) == len({id(parameter) for parameter in grouped})
     assert {id(parameter) for parameter in grouped} == {id(parameter) for parameter in trainable}
+
+
+def test_policy_preset_builds_scheduler_without_losing_differential_learning_rates(tmp_path):
+    from types import SimpleNamespace
+
+    from lerobot.optim.factory import make_optimizer_and_scheduler
+    from lerobot.policies.act_dinov3.modeling_act_dinov3 import ACTDINOv3Policy
+
+    policy = ACTDINOv3Policy(_config(tmp_path), dinov3_model=TinyDINOv3())
+    train_config = SimpleNamespace(
+        use_policy_training_preset=True,
+        optimizer=policy.config.get_optimizer_preset(),
+        scheduler=policy.config.get_scheduler_preset(),
+        steps=100,
+    )
+
+    optimizer, scheduler = make_optimizer_and_scheduler(train_config, policy)
+
+    assert scheduler is not None
+    assert [group["initial_lr"] for group in optimizer.param_groups] == [1e-5, 1e-6]
+    assert optimizer.param_groups[0]["lr"] / optimizer.param_groups[1]["lr"] == pytest.approx(10)
+
+    # The 500k schedule is auto-scaled to this 100-step unit test, so warmup is 5 steps.
+    for _ in range(5):
+        optimizer.step()
+        scheduler.step()
+
+    assert [group["lr"] for group in optimizer.param_groups] == [1e-5, 1e-6]
 
 
 def test_policy_casts_dinov3_features_to_projection_dtype(tmp_path):

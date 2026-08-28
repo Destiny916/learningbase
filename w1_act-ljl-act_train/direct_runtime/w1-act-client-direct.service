@@ -1,0 +1,13 @@
+[Unit]
+Description=W1 direct ACT client on PC1 (no XWiz GUI)
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/dexforce/w1/w1_act/start_pc1_direct.sh
+Restart=on-failure
+RestartSec=2
+Environment=PYTHONUNBUFFERED=1
+
+[Install]
+WantedBy=default.target

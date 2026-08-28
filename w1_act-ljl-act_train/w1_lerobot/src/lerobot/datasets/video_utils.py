@@ -110,6 +110,15 @@ def decode_video_frames_torchvision(
     # set a video stream reader
     # TODO(rcadene): also load audio stream at the same time
     reader = torchvision.io.VideoReader(video_path, "video")
+    # Keep PyAV's per-stream decoder thread count bounded for reproducible
+    # multi-worker training. VideoReader exposes the underlying container for
+    # the pyav backend; older torchvision builds may not expose thread_count,
+    # so retain a safe compatibility fallback.
+    if backend == "pyav":
+        try:
+            reader.container.streams.video[0].thread_count = 1
+        except (AttributeError, IndexError, TypeError):
+            logging.warning("Unable to set PyAV decoder thread_count=1 on this torchvision build")
 
     # set the first and last requested timestamps
     # Note: previous timestamps are usually loaded, since we need to access the previous key frame

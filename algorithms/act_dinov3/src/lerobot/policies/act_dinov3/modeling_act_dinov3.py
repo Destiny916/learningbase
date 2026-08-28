@@ -34,6 +34,7 @@ class ACTDINOv3(ACT):
                 patch_size=config.dinov3_patch_size,
                 gradient_checkpointing=config.dinov3_gradient_checkpointing,
                 autocast_dtype=config.dinov3_autocast_dtype,
+                apply_image_normalization=config.dinov3_apply_image_normalization,
             )
         elif config.dinov3_model_config is not None:
             spatial = DINOv3SpatialBackbone.from_model_config(
@@ -42,6 +43,7 @@ class ACTDINOv3(ACT):
                 patch_size=config.dinov3_patch_size,
                 gradient_checkpointing=config.dinov3_gradient_checkpointing,
                 autocast_dtype=config.dinov3_autocast_dtype,
+                apply_image_normalization=config.dinov3_apply_image_normalization,
             )
         else:
             spatial = DINOv3SpatialBackbone.from_pretrained(
@@ -50,6 +52,7 @@ class ACTDINOv3(ACT):
                 patch_size=config.dinov3_patch_size,
                 gradient_checkpointing=config.dinov3_gradient_checkpointing,
                 autocast_dtype=config.dinov3_autocast_dtype,
+                apply_image_normalization=config.dinov3_apply_image_normalization,
             )
         model_config = spatial.model.config
         config.dinov3_model_config = (

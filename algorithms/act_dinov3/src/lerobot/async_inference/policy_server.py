@@ -60,6 +60,9 @@ from .helpers import (
     raw_observation_to_observation,
 )
 
+RELATIVE_JOINT_PREVIOUS_STATE_KEY = "__relative_joint_previous_state"
+RELATIVE_JOINT_CURRENT_SEQUENCE_KEY = "__relative_joint_current_sequence"
+
 
 class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
     prefix = "policy_server"
@@ -149,7 +152,19 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         policy_class = get_policy_class(self.policy_type)
 
         start = time.perf_counter()
-        self.policy = policy_class.from_pretrained(policy_specs.pretrained_name_or_path)
+        # Keep construction and safetensor loading on CPU.  Some ACT-DINOv3
+        # checkpoints declare device="cuda" in config.json; passing that
+        # config through from_pretrained() would migrate the large backbone
+        # once during construction and again at the server boundary.
+        cpu_config = policy_class.config_class.from_pretrained(
+            policy_specs.pretrained_name_or_path,
+        )
+        cpu_config.device = "cpu"
+        self.policy = policy_class.from_pretrained(
+            policy_specs.pretrained_name_or_path,
+            config=cpu_config,
+            device="cpu",
+        )
         self.policy.to(self.device)
 
         # Load preprocessor and postprocessor, overriding device to match requested device
@@ -274,7 +289,18 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
             self.logger.debug(f"Skipping observation #{obs.get_timestep()} - Timestep predicted already!")
             return False
 
-        elif observations_similar(obs, previous_obs, lerobot_features=self.lerobot_features):
+        # Relative-state clients attach consecutive hardware feedback
+        # sequence numbers.  Their physical deltas are often much smaller
+        # than the generic absolute-state similarity threshold, so accepting
+        # only when the L2 norm exceeds that threshold would block every
+        # replanning cycle after the first chunk.
+        current_sequence = obs.get_observation().get(RELATIVE_JOINT_CURRENT_SEQUENCE_KEY)
+        previous_sequence = previous_obs.get_observation().get(RELATIVE_JOINT_CURRENT_SEQUENCE_KEY)
+        if current_sequence is not None and previous_sequence is not None:
+            if int(current_sequence) != int(previous_sequence):
+                return True
+
+        if observations_similar(obs, previous_obs, lerobot_features=self.lerobot_features):
             self.logger.debug(
                 f"Skipping observation #{obs.get_timestep()} - Observation too similar to last obs predicted!"
             )
@@ -339,8 +365,25 @@ class PolicyServer(services_pb2_grpc.AsyncInferenceServicer):
         """
         """1. Prepare observation"""
         start_prepare = time.perf_counter()
+        raw_observation = observation_t.get_observation()
+
+        # The robot client samples two consecutive hardware feedback frames and
+        # uploads the previous one as metadata.  Bind that exact frame to the
+        # relative processor before it computes current - previous; otherwise
+        # an async/full-chunk client would make the processor's cache represent
+        # the last inference request instead of the last physical feedback.
+        previous_state = raw_observation.get(RELATIVE_JOINT_PREVIOUS_STATE_KEY)
+        if previous_state is not None and self.preprocessor is not None:
+            for step in self.preprocessor.steps:
+                if hasattr(step, "_last_observation_state"):
+                    previous_tensor = torch.as_tensor(previous_state, dtype=torch.float32)
+                    if previous_tensor.ndim == 1:
+                        previous_tensor = previous_tensor.unsqueeze(0)
+                    step._last_observation_state = previous_tensor
+                    break
+
         observation: Observation = raw_observation_to_observation(
-            observation_t.get_observation(),
+            raw_observation,
             self.lerobot_features,
             self.policy_image_features,
         )

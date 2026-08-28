@@ -15,10 +15,12 @@ def test_act_dinov3_config_registers_independently_from_act(tmp_path: Path):
     assert config.chunk_size == 100
     assert config.pretrained_backbone_weights is None
     assert config.dinov3_learning_rate == 1e-6
+    assert config.dinov3_apply_image_normalization is True
     assert config.dinov3_gradient_checkpointing is True
     assert config.dinov3_autocast_dtype == "bfloat16"
     assert config.dinov3_num_register_tokens == 4
     assert config.dinov3_patch_size == 16
+    assert config.normalization_mapping["VISUAL"].value == "IDENTITY"
     assert PreTrainedConfig.get_choice_class("act_dinov3") is ACTDINOv3Config
 
 
@@ -39,3 +41,27 @@ def test_act_dinov3_config_requires_an_initialization_path():
 
     with pytest.raises(ValueError, match="DINOv3 initialization path"):
         ACTDINOv3Config(dinov3_pretrained_path="")
+
+
+def test_act_dinov3_exposes_optimizer_and_scheduler_presets(tmp_path: Path):
+    from lerobot.optim.schedulers import CosineDecayWithWarmupSchedulerConfig
+    from lerobot.policies.act_dinov3.configuration_act_dinov3 import ACTDINOv3Config
+
+    weights = tmp_path / "dinov3"
+    weights.mkdir()
+    config = ACTDINOv3Config(
+        dinov3_pretrained_path=str(weights),
+        scheduler_warmup_steps=25_000,
+        scheduler_decay_steps=500_000,
+        scheduler_decay_lr=1e-6,
+    )
+
+    scheduler = config.get_scheduler_preset()
+
+    assert scheduler is not None
+    assert isinstance(scheduler, CosineDecayWithWarmupSchedulerConfig)
+    assert scheduler.num_warmup_steps == 25_000
+    assert scheduler.num_decay_steps == 500_000
+    assert scheduler.peak_lr == config.optimizer_lr
+    assert scheduler.decay_lr == 1e-6
+    assert scheduler.decay_after_warmup is True

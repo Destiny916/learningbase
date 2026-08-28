@@ -1,5 +1,6 @@
 import numpy as np
 import pytest
+import xwiz_real_runtime.runtime as runtime
 
 from xwiz_real_runtime.runtime import (
     ACT_DEFAULT_20,
@@ -157,6 +158,68 @@ def test_single_chunk_gate_stops_exactly_after_frame_100():
         gate.mark_published()
 
 
+def test_continuous_gate_crosses_chunk_boundary_without_completing_session():
+    assert hasattr(runtime, "ChunkExecutionGate")
+    assert hasattr(runtime, "EXECUTION_CONTINUOUS")
+    gate = runtime.ChunkExecutionGate(runtime.EXECUTION_CONTINUOUS, chunk_size=100)
+
+    progress = None
+    for _ in range(100):
+        progress = gate.mark_published()
+
+    assert progress.chunk_index == 1
+    assert progress.frame_in_chunk == 100
+    assert progress.chunk_complete is True
+    assert progress.session_complete is False
+
+    next_progress = gate.mark_published()
+    assert next_progress.chunk_index == 2
+    assert next_progress.frame_in_chunk == 1
+    assert next_progress.session_complete is False
+
+
+def test_single_execution_mode_remains_bounded_to_one_chunk():
+    assert hasattr(runtime, "ChunkExecutionGate")
+    assert hasattr(runtime, "EXECUTION_SINGLE")
+    gate = runtime.ChunkExecutionGate(runtime.EXECUTION_SINGLE, chunk_size=100)
+
+    for _ in range(99):
+        assert gate.mark_published().session_complete is False
+    assert gate.mark_published().session_complete is True
+    with pytest.raises(RuntimeContractError, match="already complete"):
+        gate.mark_published()
+
+
+def test_continuous_config_removes_the_100_frame_session_limit():
+    config = prepare_client_config(
+        {"execution_mode": "continuous", "max_steps": 100},
+        mode=2,
+    )
+
+    assert config["execution_mode"] == "continuous"
+    assert config["action_horizon"] == 100
+    assert config["max_steps"] > 100
+    assert config["chunk_size_threshold"] == 0.0
+
+
+def test_continuous_mode_is_rejected_for_simulation():
+    with pytest.raises(RuntimeContractError, match="only available in real mode"):
+        prepare_client_config({"execution_mode": "continuous"}, mode=1)
+
+
+def test_next_chunk_waits_for_empty_queue_and_feedback_after_completion():
+    assert hasattr(runtime, "should_request_next_chunk")
+    common = {
+        "execution_mode": "continuous",
+        "frame_in_chunk": 100,
+        "chunk_completed_at": 20.0,
+    }
+
+    assert runtime.should_request_next_chunk(queue_size=1, feedback_received_at=21.0, **common) is False
+    assert runtime.should_request_next_chunk(queue_size=0, feedback_received_at=19.0, **common) is False
+    assert runtime.should_request_next_chunk(queue_size=0, feedback_received_at=21.0, **common) is True
+
+
 def test_simulation_and_real_topics_are_strictly_isolated():
     simulation = mode_topics(1)
     real = mode_topics(2)
@@ -200,11 +263,12 @@ def test_real_linker_feedback_ratios_are_scaled_to_command_percentages():
     )
 
 
-def test_hand_feedback_scale_rejects_values_outside_ratio_range():
-    with pytest.raises(RuntimeContractError, match="0..1"):
+def test_hand_feedback_scale_accepts_ratio_or_percentage_and_rejects_outside_range():
+    with pytest.raises(RuntimeContractError, match="0..100"):
         normalize_hand_feedback([0.0, -0.01, 0.0, 0.0, 0.0, 0.0])
-    with pytest.raises(RuntimeContractError, match="0..1"):
-        normalize_hand_feedback([0.0, 1.01, 0.0, 0.0, 0.0, 0.0])
+    assert normalize_hand_feedback([20.0, 10.0, 30.0, 40.0, 50.0, 60.0]) == (20.0, 10.0, 30.0, 40.0, 50.0, 60.0)
+    with pytest.raises(RuntimeContractError, match="0..100"):
+        normalize_hand_feedback([0.0, 100.01, 0.0, 0.0, 0.0, 0.0])
 
 
 def test_vendor_timed_actions_must_form_one_complete_chunk():

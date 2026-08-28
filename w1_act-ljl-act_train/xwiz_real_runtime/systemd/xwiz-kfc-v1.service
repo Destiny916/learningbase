@@ -1,0 +1,15 @@
+[Unit]
+Description=PC1 KFC v1 head stereo camera for XWiz inference
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=ROS_DOMAIN_ID=20
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+Environment="CYCLONEDDS_URI=<CycloneDDS><Domain><General><Interfaces><NetworkInterface address=\"192.168.20.20\"/></Interfaces><AllowMulticast>spdp</AllowMulticast></General></Domain></CycloneDDS>"
+ExecStart=/usr/bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/dexforce/w1/install/setup.bash && exec ros2 launch dexe_sensors_launch kfc_nodes.launch.py kfc_mode:=resize_compressed'
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

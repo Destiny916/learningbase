@@ -4,6 +4,7 @@
   "manager_port": 8890,
   "action_horizon": 100,
   "mode": 1,
+  "execution_mode": "continuous",
   "head_target_size": [640, 360],
   "hand_target_size": [640, 360],
   "control_frequency": 10,

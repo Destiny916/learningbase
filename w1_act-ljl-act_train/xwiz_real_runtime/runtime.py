@@ -12,6 +12,12 @@ class RuntimeContractError(RuntimeError):
     """Raised before publication when a real-robot contract is violated."""
 
 
+EXECUTION_SINGLE = "single"
+EXECUTION_CONTINUOUS = "continuous"
+# Vendor worker loops require a finite numeric max_steps value.
+CONTINUOUS_MAX_STEPS = 9_007_199_254_740_991
+
+
 BODY_ORDER = (
     "WAIST",
     "LEFT_J1", "LEFT_J2", "LEFT_J3", "LEFT_J4", "LEFT_J5", "LEFT_J6", "LEFT_J7",
@@ -107,12 +113,20 @@ def scalar_from_hand_command(
 
 
 def normalize_hand_feedback(positions: Sequence[float]) -> tuple[float, ...]:
-    """Convert Linker L6 ratio feedback (0..1) to its command scale (0..100)."""
+    """Convert Linker L6 feedback to the ACT command scale (0..100).
+
+    W1 firmware versions report either normalized ratios (0..1) or percentage
+    values (0..100).  The v0.4.6 Linker feedback observed on this robot is the
+    latter, so accept both wire representations without changing the model
+    contract.
+    """
     values = np.asarray(positions, dtype=np.float64)
     if values.shape != (6,) or not np.isfinite(values).all():
         raise RuntimeContractError("hand feedback must contain six finite values")
-    if np.any(values < 0.0) or np.any(values > 1.0):
-        raise RuntimeContractError("Linker L6 feedback positions must be in 0..1")
+    if np.any(values < 0.0) or np.any(values > 100.0):
+        raise RuntimeContractError("Linker L6 feedback positions must be in 0..100")
+    if np.any(values > 1.0):
+        return tuple(float(value) for value in values)
     return tuple(float(value) for value in values * 100.0)
 
 
@@ -239,16 +253,100 @@ def validate_robot_ready(payload: Mapping[str, object], tolerance_rad: float = 0
 def prepare_client_config(config: Mapping[str, object], mode: int) -> dict[str, object]:
     if mode not in (1, 2):
         raise RuntimeContractError(f"mode must be 1 or 2, got {mode}")
+    execution_mode = str(config.get("execution_mode", EXECUTION_SINGLE))
+    if execution_mode not in (EXECUTION_SINGLE, EXECUTION_CONTINUOUS):
+        raise RuntimeContractError(
+            f"execution_mode must be {EXECUTION_SINGLE!r} or {EXECUTION_CONTINUOUS!r}"
+        )
+    if execution_mode == EXECUTION_CONTINUOUS and mode != 2:
+        raise RuntimeContractError("continuous execution is only available in real mode")
     prepared = dict(config)
     prepared.update(
         mode=mode,
+        execution_mode=execution_mode,
         action_horizon=100,
-        max_steps=100,
+        max_steps=(
+            CONTINUOUS_MAX_STEPS
+            if execution_mode == EXECUTION_CONTINUOUS
+            else 100
+        ),
         sample_factor=1.0,
         chunk_size_threshold=0.0,
         home_position="",
     )
     return prepared
+
+
+@dataclass(frozen=True)
+class ActionProgress:
+    global_frame: int
+    chunk_index: int
+    frame_in_chunk: int
+    chunk_complete: bool
+    session_complete: bool
+
+
+class ChunkExecutionGate:
+    def __init__(self, execution_mode: str, chunk_size: int = 100):
+        if execution_mode not in (EXECUTION_SINGLE, EXECUTION_CONTINUOUS):
+            raise ValueError(f"unsupported execution mode: {execution_mode}")
+        if chunk_size <= 0:
+            raise ValueError("chunk_size must be positive")
+        self.execution_mode = execution_mode
+        self.chunk_size = int(chunk_size)
+        self.published = 0
+
+    def mark_published(self) -> ActionProgress:
+        if self.execution_mode == EXECUTION_SINGLE and self.published >= self.chunk_size:
+            raise RuntimeContractError("single action chunk is already complete")
+        self.published += 1
+        chunk_index = (self.published - 1) // self.chunk_size + 1
+        frame_in_chunk = (self.published - 1) % self.chunk_size + 1
+        chunk_complete = frame_in_chunk == self.chunk_size
+        return ActionProgress(
+            global_frame=self.published,
+            chunk_index=chunk_index,
+            frame_in_chunk=frame_in_chunk,
+            chunk_complete=chunk_complete,
+            session_complete=(
+                self.execution_mode == EXECUTION_SINGLE and chunk_complete
+            ),
+        )
+
+
+def should_request_next_chunk(
+    *,
+    execution_mode: str,
+    queue_size: int,
+    frame_in_chunk: int,
+    chunk_completed_at: float,
+    feedback_received_at: float,
+) -> bool:
+    if execution_mode != EXECUTION_CONTINUOUS:
+        return queue_size == 0
+    return (
+        queue_size == 0
+        and frame_in_chunk == 100
+        and chunk_completed_at > 0.0
+        and feedback_received_at > chunk_completed_at
+    )
+
+
+def validate_feedback_freshness(
+    received_at: float,
+    *,
+    now: float,
+    timeout_seconds: float,
+) -> float:
+    if received_at <= 0.0:
+        raise RuntimeContractError("real execution has no robot state timestamp")
+    age = float(now) - float(received_at)
+    if age < 0.0 or age > float(timeout_seconds):
+        raise RuntimeContractError(
+            f"robot state feedback is stale: age={age:.3f}s "
+            f"limit={float(timeout_seconds):.3f}s"
+        )
+    return age
 
 
 class SingleChunkGate:

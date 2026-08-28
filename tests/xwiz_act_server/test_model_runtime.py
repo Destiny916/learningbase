@@ -2,6 +2,7 @@ from pathlib import Path
 
 import numpy as np
 import pytest
+import xwiz_act_server.model_runtime as model_runtime
 
 from xwiz_act_server.model_runtime import (
     CheckpointError,
@@ -64,6 +65,50 @@ def test_load_policy_config_decodes_config_json_without_training_stack(tmp_path)
     config = load_policy_config(FakePolicy, tmp_path, "cuda", decoder=decoder)
     assert isinstance(config, FakeConfig)
     assert config.device == "cuda"
+
+
+def test_normalize_observation_batches_state_and_converts_hwc_uint8_images_to_chw():
+    assert hasattr(model_runtime, "normalize_observation")
+    observation = {
+        "observation.state": np.array([3.0, 5.0], dtype=np.float32),
+        "observation.images.cam_high_left": np.array(
+            [[[255, 0, 128], [0, 255, 64]]], dtype=np.uint8
+        ),
+    }
+    stats = {
+        "observation.state": {
+            "mean": np.array([1.0, 1.0], dtype=np.float32),
+            "std": np.array([2.0, 4.0], dtype=np.float32),
+        },
+        "observation.images.cam_high_left": {
+            "mean": np.zeros((3, 1, 1), dtype=np.float32),
+            "std": np.ones((3, 1, 1), dtype=np.float32),
+        },
+    }
+
+    batch = model_runtime.normalize_observation(observation, stats)
+
+    np.testing.assert_allclose(batch["observation.state"], [[1.0, 1.0]])
+    assert batch["observation.images.cam_high_left"].shape == (1, 3, 1, 2)
+    np.testing.assert_allclose(
+        batch["observation.images.cam_high_left"][0, :, 0, 0],
+        [1.0, 0.0, 128.0 / 255.0],
+    )
+
+
+def test_unnormalize_action_chunk_uses_checkpoint_action_mean_and_std():
+    assert hasattr(model_runtime, "unnormalize_action_chunk")
+    normalized = np.zeros((1, 100, 19), dtype=np.float32)
+    mean = np.arange(19, dtype=np.float32)
+    std = np.full(19, 2.0, dtype=np.float32)
+
+    actions = model_runtime.unnormalize_action_chunk(
+        normalized,
+        {"action": {"mean": mean, "std": std}},
+    )
+
+    assert actions.shape == (100, 19)
+    np.testing.assert_allclose(actions[0], mean)
 
 
 @pytest.mark.parametrize(

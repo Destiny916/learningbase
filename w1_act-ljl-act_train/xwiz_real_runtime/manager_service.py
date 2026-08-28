@@ -1,7 +1,8 @@
-"""Run the PC1 XWiz manager with deploy/start separation and safe configs."""
+"""Run the PC1 XWiz manager with guarded single or continuous configs."""
 
 from __future__ import annotations
 
+import json
 import time
 
 import rclpy
@@ -11,15 +12,28 @@ from act_async_infer_distributed_demo.scripts.manager.config_registry import Con
 from act_async_infer_distributed_demo.scripts.manager.inference_manager import InferenceManager
 from act_async_infer_distributed_demo.scripts.utils_distributed import log_error, log_info, log_warning
 
-from .manager_runtime import deploy_selected, prepare_resolved_configs
+from .manager_runtime import deploy_selected, lerobot_model_meta, prepare_resolved_configs
 
 
 _vendor_resolve_config = ConfigRegistry.resolve_config
+_vendor_resolve_state_meta = ConfigRegistry.resolve_state_meta
 
 
-def resolve_single_chunk_config(self, model_id, task_id, mode):
+def resolve_guarded_config(self, model_id, task_id, mode):
     client, server = _vendor_resolve_config(self, model_id, task_id, mode)
     return prepare_resolved_configs(client, server, int(mode))
+
+
+def resolve_guarded_state_meta(self, model_id):
+    cameras, groups = _vendor_resolve_state_meta(self, model_id)
+    if cameras or any(group.is_selected for group in groups):
+        return cameras, groups
+
+    with open(self.find_state_meta_path(model_id), encoding="utf-8") as stream:
+        fallback_cameras, selected_groups = lerobot_model_meta(json.load(stream))
+    for group in groups:
+        group.is_selected = group.group_name in selected_groups
+    return fallback_cameras, groups
 
 
 def deploy_and_start(self, request, response):
@@ -71,7 +85,8 @@ def safe_destroy(self):
 
 
 def main() -> None:
-    ConfigRegistry.resolve_config = resolve_single_chunk_config
+    ConfigRegistry.resolve_config = resolve_guarded_config
+    ConfigRegistry.resolve_state_meta = resolve_guarded_state_meta
     InferenceManager._handle_deploy = deploy_and_start
     InferenceManager._watchdog_callback = resilient_watchdog
     InferenceManager.destroy = safe_destroy

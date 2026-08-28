@@ -52,6 +52,13 @@ class TrainPipelineConfig(HubMixin):
     seed: int | None = 1000
     # Number of workers for the dataloader.
     num_workers: int = 4
+    # DataLoader prefetching/worker persistence. These are explicit so large
+    # remote runs can control host-side video decode pressure.
+    prefetch_factor: int = 2
+    persistent_workers: bool = False
+    # Kept as a config field for launch reproducibility. The training loop
+    # performs one optimizer update per batch when this is 1.
+    gradient_accumulation_steps: int = 1
     batch_size: int = 8
     steps: int = 100_000
     eval_freq: int = 20_000
@@ -79,6 +86,12 @@ class TrainPipelineConfig(HubMixin):
     checkpoint_path: Path | None = field(init=False, default=None)
 
     def validate(self) -> None:
+        if self.prefetch_factor < 1:
+            raise ValueError(f"prefetch_factor must be >= 1, got {self.prefetch_factor}")
+        if self.gradient_accumulation_steps < 1:
+            raise ValueError(
+                f"gradient_accumulation_steps must be >= 1, got {self.gradient_accumulation_steps}"
+            )
         # HACK: We parse again the cli args here to get the pretrained paths if there was some.
         policy_path = parser.get_path_arg("policy")
         if policy_path:

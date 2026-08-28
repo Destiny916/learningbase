@@ -1,0 +1,30 @@
+{
+  "client_config": {
+    "action_horizon": 100,
+    "chunk_size_threshold": 0.0,
+    "collect_frequency": 10,
+    "control_frequency": 10,
+    "end_effector_type": "gripper",
+    "execution_mode": "continuous",
+    "home_position": "",
+    "sample_factor": 1.0,
+    "server_host": "192.168.20.21",
+    "server_port": 8889,
+    "time_infer": 0.5,
+    "use_hand_camera": true,
+    "hand_target_size": [640, 360],
+    "mode": 2
+  },
+  "description": "W1真机：完整执行每个100帧动作块，再按最新观测生成下一块，直到人工停止",
+  "instruction": "1123",
+  "max_duration": 900719925474099,
+  "name": "ACT Popcorn 真机无限连续（PC2推理）",
+  "server_config": {
+    "data_type": "real",
+    "inverse_gripper": false,
+    "is_gripper_bool": false,
+    "save_input": false
+  },
+  "status": "未知",
+  "task_id": 3
+}

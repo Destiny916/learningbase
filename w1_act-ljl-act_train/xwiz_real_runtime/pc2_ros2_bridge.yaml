@@ -1,0 +1,148 @@
+# ROS2 bridge topic configuration
+# EventBus event names == ROS2 topic names (same-name forwarding)
+# - outbound_topics: Events published by app -> forwarded to ROS2 topics
+# - inbound_topics:  ROS2 subscriptions -> forwarded to EventBus with same name
+
+# redundant, should be removed later
+outbound_topics:
+
+# redundant, should be removed later
+inbound_topics:
+
+
+# Optional type mappings (per-topic). When omitted, defaults to std_msgs/msg/String.
+# This keeps transport details in config and out of business logic.
+inbound_types:
+  /feedback/robot_server_state: std_msgs/msg/String
+  /camera/kfc_calib_data: std_msgs/msg/String
+  /camera/kfc_compressed: sensor_msgs/msg/CompressedImage
+  /camera/left_eye_resize: sensor_msgs/msg/Image
+  /camera/right_eye_resize: sensor_msgs/msg/Image
+  /camera/kfc_status: std_msgs/msg/String
+  /orbbec/front/rgb: sensor_msgs/msg/Image
+  /orbbec/front/depth: sensor_msgs/msg/Image
+  /orbbec/front/camera_info: sensor_msgs/msg/CameraInfo
+  /orbbec/rear/rgb: sensor_msgs/msg/Image
+  /orbbec/rear/depth: sensor_msgs/msg/Image
+  /orbbec/rear/camera_info: sensor_msgs/msg/CameraInfo
+  /diagnostics_agg: diagnostic_msgs/msg/DiagnosticArray
+  /supervisor/system_status: supervisor_interfaces/msg/SystemStatus
+  /laser_scan/front: sensor_msgs/msg/LaserScan
+  /laser_scan/rear: sensor_msgs/msg/LaserScan
+  /feedback/ee/left: end_effector_interfaces/msg/EEFeedback
+  /feedback/ee/right: end_effector_interfaces/msg/EEFeedback
+  /control/ee/left: end_effector_interfaces/msg/EEJointControl
+  /control/ee/right: end_effector_interfaces/msg/EEJointControl
+  /feedback/power_board_status: device_interfaces/msg/PowerBoardStatus
+  /camera_l/color/image_rect_raw: sensor_msgs/msg/Image
+  /camera_l/aligned_depth_to_color/image_raw: sensor_msgs/msg/Image
+  /camera_l/aligned_depth_to_color/camera_info: sensor_msgs/msg/CameraInfo
+  /camera_r/color/image_rect_raw: sensor_msgs/msg/Image
+  /camera_r/aligned_depth_to_color/image_raw: sensor_msgs/msg/Image
+  /camera_r/aligned_depth_to_color/camera_info: sensor_msgs/msg/CameraInfo
+  /imu/chassis: sensor_msgs/msg/Imu
+  # /feedback/joint: sensor_msgs/msg/JointState
+  # Phase 0 action types (result/feedback)
+  #action_/control/move_robot/result: my_pkg/action/MoveRobot
+  #action_/control/move_robot/feedback: my_pkg/action/MoveRobot
+  # Phase 0 service stub response type
+  # service_/mapping_node/set_map_name/response: nav_interfaces/srv/SetMapName_Response
+  # service_/mapping_node/finish_mapping/response: std_srvs/srv/Trigger_Response
+  # service_/save_map/response: my_pkg/service/SaveMap_Response
+
+  # ============= Model Deployment ==============
+  # /camera/left_eye_resize: sensor_msgs/msg/Image    # Uncomment it for inference
+  # /camera/right_eye_resize: sensor_msgs/msg/Image   # Uncomment it for inference
+  /mj_sim/control/hand/left: end_effector_interfaces/msg/EEJointControl
+  /mj_sim/control/hand/right: end_effector_interfaces/msg/EEJointControl
+  /mj_sim/control/joint_position: joint_interfaces/msg/JointPositionControl
+  /inference/status: inference_interfaces/msg/InferenceStatus
+  /inference/prompt: std_msgs/msg/String
+  service_/inference/start_inference/response: inference_interfaces/srv/StartInference_Response
+  service_/inference/stop_inference/response: std_srvs/srv/Trigger_Response
+  service_/inference/deploy/response: inference_interfaces/srv/Deploy_Response
+  service_/inference/get_model_info/response: inference_interfaces/srv/GetModelInfo_Response
+  service_/inference/export_shadow_segments/response: inference_interfaces/srv/ExportShadowSegments_Response
+
+outbound_types:
+  /control/joint_position: joint_interfaces/msg/JointPositionControl
+  /control/robot_task: task_interfaces/msg/RobotTask
+  action_/supervisor/change_system_mode: supervisor_interfaces/action/ChangeSystemMode
+  service_/supervisor/diagnose_error: supervisor_interfaces/srv/DiagnoseError
+  service_/supervisor/recover_error: supervisor_interfaces/srv/RecoverError
+  action_/control/move_robot: robot_server_interfaces/action/MoveRobot
+  service_/mapping_node/set_map_name: nav_interfaces/srv/SetMapName
+  service_/mapping_node/finish_mapping: std_srvs/srv/Trigger
+  service_/control/set_property: robot_server_interfaces/srv/SetProperty
+  service_/save_charging_pose: std_srvs/srv/Trigger
+  action_/auto_charging: chassis_interfaces/action/AutoCharging
+  service_/inference/start_inference: inference_interfaces/srv/StartInference_Request
+  service_/inference/stop_inference: std_srvs/srv/Trigger_Request
+  service_/inference/deploy: inference_interfaces/srv/Deploy_Request
+  service_/inference/get_model_info: inference_interfaces/srv/GetModelInfo_Request
+  service_/inference/export_shadow_segments: inference_interfaces/srv/ExportShadowSegments_Request
+
+  # ============= 遥操模式配置 =============
+  # GET: 空请求 -> bool success + string message (JSON 编码的三组配置)
+  # SET: string config_json -> bool success + string message
+  service_/teleop_config/get: teleop_interfaces/srv/TeleopConfigGet
+  service_/teleop_config/set: teleop_interfaces/srv/TeleopConfigSet
+
+  # ============= 模型部署相关（当前不使用仿真物理引擎的传感器接口）==============
+  /mj_sim/feedback/robot_server_state: std_msgs/msg/String
+  /mj_sim/feedback/joint: sensor_msgs/msg/JointState
+  /mj_sim/camera/left_eye_resize: sensor_msgs/msg/Image
+  /mj_sim/camera/right_eye_resize: sensor_msgs/msg/Image
+  /mj_sim/camera_l/color/image_rect_raw: sensor_msgs/msg/Image
+  /mj_sim/camera_r/color/image_rect_raw: sensor_msgs/msg/Image
+  /mj_sim/feedback/hand/left: end_effector_interfaces/msg/EEJointFeedback
+  /mj_sim/feedback/hand/right: end_effector_interfaces/msg/EEJointFeedback
+
+  /supervisor/system_command: supervisor_interfaces/msg/SystemCommand
+ament:
+  distro_setup: /opt/ros/humble/setup.bash
+  overlays:
+  - /home/dexforce/w1/install
+
+# Global action client defaults (effective when real client is enabled later)
+action_client:
+  wait_server_ms: 1000
+  result_timeout_ms: 180000
+
+# Global service client defaults (stub only for Phase 0)
+service_client:
+  wait_server_ms: 1000
+  response_timeout_ms: 60000
+
+sampling:
+  default_every: 1
+  topics:
+    - name: /diagnostics_agg
+      every: 1
+    - name: /feedback/robot_server_state
+      every: 10
+
+extract_arrays:
+  # Primitive array paths (type-prefixed) to always extract regardless of size
+  extract_paths:
+    - sensor_msgs/msg/CompressedImage.data
+    - sensor_msgs/msg/Image.data
+    - sensor_msgs/msg/LaserScan.ranges
+    - sensor_msgs/msg/LaserScan.intensities
+  # Threshold: arrays with element count greater than this will be extracted
+  max_inline_bytes: 10001
+  # When true: extracted field replaced by length (integer). When false: replaced by []
+  emit_length: true
+
+# Topics for FPS statistics (independent subscription, no deserialization, no impact on forwarding).
+# Bridge creates a lightweight GenericSubscription for each topic; the callback only does
+# atomic counter increment. FPS is broadcast via EventBus topic "ros2.topics.fps" at 1Hz.
+fps_stats_topics:
+  - /camera/kfc_compressed
+  - /orbbec/front/rgb
+  - /orbbec/rear/rgb
+  - /camera_l/color/image_rect_raw
+  - /camera_r/color/image_rect_raw
+  - /laser_scan/front
+  - /laser_scan/rear
+  - /imu/chassis

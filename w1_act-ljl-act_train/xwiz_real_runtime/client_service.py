@@ -1,10 +1,11 @@
-"""Run the PC2 XWiz client with simulation/real isolation and one-chunk gating."""
+"""Run the W1 client with isolated single-chunk and continuous execution."""
 
 from __future__ import annotations
 
 import argparse
 import json
 from pathlib import Path
+from queue import Empty
 import sys
 import time
 import types
@@ -51,12 +52,16 @@ from .runtime import (
     LEFT_OPEN,
     RIGHT_CLOSED,
     RIGHT_OPEN,
+    ChunkExecutionGate,
+    EXECUTION_CONTINUOUS,
+    EXECUTION_SINGLE,
     RuntimeContractError,
-    SingleChunkGate,
     action_to_commands,
     feedback_positions_by_name,
     gripper_scalars_from_feedback,
     prepare_client_config,
+    should_request_next_chunk,
+    validate_feedback_freshness,
     validate_observation_buffers,
     validate_robot_health,
     validate_robot_ready,
@@ -69,6 +74,7 @@ _vendor_get_obs = OptimizedRobotClient.get_real_obs
 _vendor_get_actions = OptimizedRobotClient.get_actions
 _vendor_exec_action = OptimizedRobotClient.exec_action
 _vendor_joint_callback = OptimizedRobotClient.joint_state_callback
+_vendor_ready_to_send_observation = OptimizedRobotClient._ready_to_send_observation
 
 
 def _buffer_snapshot(client):
@@ -88,6 +94,7 @@ def _joint_state_callback(self, message):
         self._latest_robot_state = json.loads(message.data)
     except (json.JSONDecodeError, TypeError):
         self._latest_robot_state = None
+    self._latest_robot_state_received_at = time.monotonic()
     _vendor_joint_callback(self, message)
 
 
@@ -104,11 +111,15 @@ def _hand_feedback_callback(side):
     return callback
 
 
-def _setup_single_chunk(self, client_config, server_config, _home_position):
+def _setup_execution(self, client_config, server_config, _home_position):
     mode = int(client_config.get("mode", self.cfg.mode))
     prepared = prepare_client_config(client_config, mode)
+    execution_mode = prepared.pop("execution_mode")
     prepared["end_effector_type"] = "gripper"
-    self._single_chunk_gate = SingleChunkGate(100)
+    self._execution_mode = execution_mode
+    self._chunk_gate = ChunkExecutionGate(execution_mode, chunk_size=100)
+    self._received_chunk_count = 0
+    self._last_chunk_completed_at = 0.0
 
     try:
         if mode == 2:
@@ -119,7 +130,10 @@ def _setup_single_chunk(self, client_config, server_config, _home_position):
                 _buffer_snapshot(self),
                 use_wrist_images=bool(prepared.get("use_hand_camera", True)),
             )
-            log_info("Real preflight passed: ACT default pose, robot health and observations ready")
+            log_info(
+                "Real preflight passed: ACT default pose, robot health and "
+                f"observations ready; execution_mode={execution_mode}"
+            )
         else:
             log_info("Simulation deployment selected: real control topics remain unused")
     except RuntimeContractError as exc:
@@ -155,6 +169,34 @@ def _get_model_observation(self):
     self.gripper_qpos_left_buf.append((timestamp, [left_scalar]))
     self.gripper_qpos_right_buf.append((timestamp, [right_scalar]))
     return _vendor_get_obs(self)
+
+
+def _ready_for_synchronous_chunk(self):
+    if not self.allow_infer_check:
+        return None
+    if getattr(self, "_execution_mode", EXECUTION_SINGLE) != EXECUTION_CONTINUOUS:
+        return _vendor_ready_to_send_observation(self)
+    if getattr(self, "_received_chunk_count", 0) == 0:
+        return _vendor_ready_to_send_observation(self)
+
+    with self.action_queue_lock:
+        queue_size = self.action_queue.qsize()
+    progress = self._chunk_gate
+    frame_in_chunk = (progress.published - 1) % progress.chunk_size + 1
+    if not should_request_next_chunk(
+        execution_mode=self._execution_mode,
+        queue_size=queue_size,
+        frame_in_chunk=frame_in_chunk,
+        chunk_completed_at=getattr(self, "_last_chunk_completed_at", 0.0),
+        feedback_received_at=getattr(self, "_latest_robot_state_received_at", 0.0),
+    ):
+        return None
+    while True:
+        try:
+            self.observation_queue.get_nowait()
+        except Empty:
+            break
+    return _vendor_ready_to_send_observation(self)
 
 
 def _ee_message(client, values):
@@ -193,7 +235,18 @@ def _get_validated_actions(self):
     timed_actions = _vendor_get_actions(self)
     if timed_actions is not None:
         validate_timed_actions(timed_actions)
-        log_info("Validated one finite ACT action chunk with shape (100, 19)")
+        if getattr(self, "_execution_mode", EXECUTION_SINGLE) == EXECUTION_CONTINUOUS:
+            with self.action_queue_lock:
+                queued = self.action_queue.qsize()
+            if queued != 0:
+                raise RuntimeContractError(
+                    "continuous synchronous mode received a chunk before the prior queue emptied"
+                )
+        self._received_chunk_count += 1
+        log_info(
+            "Validated finite ACT action chunk "
+            f"{self._received_chunk_count} with shape (100, 19)"
+        )
     return timed_actions
 
 
@@ -210,31 +263,63 @@ def _finish_single_chunk(self, mode_name):
     log_info(f"Single {mode_name} action chunk completed; stopped after exactly 100 frames")
 
 
+def _halt_on_runtime_error(self, error):
+    with self.socket_lock:
+        try:
+            self.network_client.send_request(RequestType.STOP)
+        except Exception:
+            pass
+    self._stop_inference()
+    self._set_state(RobotState.ERROR, str(error))
+
+
 def _execute_guarded_action(self, timed_action):
     if int(self.cfg.mode) == 1:
         result = _vendor_exec_action(self, timed_action)
-        if self._single_chunk_gate.mark_published():
+        progress = self._chunk_gate.mark_published()
+        if progress.session_complete:
             _finish_single_chunk(self, "simulation")
         return result
 
-    state = getattr(self, "_latest_robot_state", None)
-    if not state:
-        raise RuntimeContractError("robot state feedback disappeared during execution")
-    validate_robot_health(state, allowed_status=("Idle", "Running"))
-    command = action_to_commands(timed_action.get_action())
+    try:
+        state = getattr(self, "_latest_robot_state", None)
+        if not state:
+            raise RuntimeContractError("robot state feedback disappeared during execution")
+        validate_feedback_freshness(
+            getattr(self, "_latest_robot_state_received_at", 0.0),
+            now=time.monotonic(),
+            timeout_seconds=1.0,
+        )
+        validate_robot_health(state, allowed_status=("Idle", "Running"))
+        command = action_to_commands(timed_action.get_action())
+    except RuntimeContractError as exc:
+        _halt_on_runtime_error(self, exc)
+        raise
     self.publish_joint_positions(command.body_names, command.body_positions, clip=False)
     self._pub_hand_left.publish(_ee_message(self, command.left_hand))
     self._pub_hand_right.publish(_ee_message(self, command.right_hand))
 
     self.current_step += 1
-    complete = self._single_chunk_gate.mark_published()
+    progress = self._chunk_gate.mark_published()
     log_info(
-        f"Executed guarded real action frame {self.current_step}/100 "
+        f"Executed guarded real action global_frame={progress.global_frame} "
+        f"chunk={progress.chunk_index} frame={progress.frame_in_chunk}/100 "
         f"left_open={timed_action.get_action()[-2]:.3f} "
         f"right_open={timed_action.get_action()[-1]:.3f}"
     )
-    if complete:
+    if progress.session_complete:
         _finish_single_chunk(self, "real")
+    elif progress.chunk_complete:
+        self._last_chunk_completed_at = time.monotonic()
+        while True:
+            try:
+                self.observation_queue.get_nowait()
+            except Empty:
+                break
+        log_info(
+            f"Continuous real chunk {progress.chunk_index} completed; "
+            "waiting for a fresh observation before requesting the next chunk"
+        )
     return timed_action
 
 
@@ -242,8 +327,9 @@ def install_hooks():
     OptimizedRobotClient.joint_state_callback = _joint_state_callback
     OptimizedRobotClient.hand_qpos6_left_callback = _hand_feedback_callback("left")
     OptimizedRobotClient.hand_qpos6_right_callback = _hand_feedback_callback("right")
-    OptimizedRobotClient._cmd_setup_config = _setup_single_chunk
+    OptimizedRobotClient._cmd_setup_config = _setup_execution
     OptimizedRobotClient.get_real_obs = _get_model_observation
+    OptimizedRobotClient._ready_to_send_observation = _ready_for_synchronous_chunk
     OptimizedRobotClient.publish_gripper_position = _publish_gripper_openness
     OptimizedRobotClient.get_actions = _get_validated_actions
     OptimizedRobotClient.exec_action = _execute_guarded_action
@@ -260,7 +346,7 @@ def main():
     rclpy.init()
     client = OptimizedRobotClient(config)
     client._start_manager_listener()
-    log_info(f"XWiz dual-mode PC2 client listening on 0.0.0.0:{config.manager_port}")
+    log_info(f"XWiz dual-mode W1 client listening on 0.0.0.0:{config.manager_port}")
     try:
         while rclpy.ok():
             rclpy.spin_once(client, timeout_sec=0.1)

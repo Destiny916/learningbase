@@ -1,0 +1,14 @@
+[Unit]
+Description=PC2 temporary black wrist image publishers for XWiz ACT
+After=network-online.target
+
+[Service]
+Type=simple
+Environment=ROS_DOMAIN_ID=20
+Environment=RMW_IMPLEMENTATION=rmw_cyclonedds_cpp
+ExecStart=/usr/bin/bash -lc 'source /opt/ros/humble/setup.bash && source /home/dexforce/w1/install/setup.bash && export PYTHONPATH=/home/dexforce/w1/w1_act && exec python3 -m xwiz_real_runtime.black_wrist_images'
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

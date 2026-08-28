@@ -25,6 +25,7 @@ class DINOv3SpatialBackbone(nn.Module):
         patch_size: int,
         gradient_checkpointing: bool,
         autocast_dtype: str,
+        apply_image_normalization: bool = True,
     ) -> None:
         super().__init__()
         self.model = model
@@ -32,6 +33,17 @@ class DINOv3SpatialBackbone(nn.Module):
         self.num_register_tokens = num_register_tokens
         self.patch_size = patch_size
         self.autocast_dtype = _AUTOCAST_DTYPES[autocast_dtype]
+        self.apply_image_normalization = apply_image_normalization
+        self.register_buffer(
+            "_image_mean",
+            torch.tensor([0.485, 0.456, 0.406], dtype=torch.float32).view(1, 3, 1, 1),
+            persistent=False,
+        )
+        self.register_buffer(
+            "_image_std",
+            torch.tensor([0.229, 0.224, 0.225], dtype=torch.float32).view(1, 3, 1, 1),
+            persistent=False,
+        )
         model_config = getattr(model, "config", None)
         model_image_size = getattr(model_config, "image_size", 224)
         model_patch_size = getattr(model_config, "patch_size", patch_size)
@@ -59,6 +71,7 @@ class DINOv3SpatialBackbone(nn.Module):
         patch_size: int,
         gradient_checkpointing: bool,
         autocast_dtype: str,
+        apply_image_normalization: bool = True,
     ) -> "DINOv3SpatialBackbone":
         path = Path(pretrained_path)
         if not path.is_dir():
@@ -75,6 +88,7 @@ class DINOv3SpatialBackbone(nn.Module):
             patch_size=patch_size,
             gradient_checkpointing=gradient_checkpointing,
             autocast_dtype=autocast_dtype,
+            apply_image_normalization=apply_image_normalization,
         )
 
     @classmethod
@@ -86,6 +100,7 @@ class DINOv3SpatialBackbone(nn.Module):
         patch_size: int,
         gradient_checkpointing: bool,
         autocast_dtype: str,
+        apply_image_normalization: bool = True,
     ) -> "DINOv3SpatialBackbone":
         from transformers import AutoConfig, AutoModel
 
@@ -102,6 +117,7 @@ class DINOv3SpatialBackbone(nn.Module):
             patch_size=patch_size,
             gradient_checkpointing=gradient_checkpointing,
             autocast_dtype=autocast_dtype,
+            apply_image_normalization=apply_image_normalization,
         )
 
     def _autocast_context(self, image: Tensor):
@@ -113,6 +129,11 @@ class DINOv3SpatialBackbone(nn.Module):
     def forward(self, image: Tensor) -> Tensor:
         if image.ndim != 4 or tuple(image.shape[-2:]) != (224, 224):
             raise ValueError(f"DINOv3 expects BxCx224x224 images, got {tuple(image.shape)}")
+
+        if self.apply_image_normalization:
+            mean = self._image_mean.to(device=image.device, dtype=image.dtype)
+            std = self._image_std.to(device=image.device, dtype=image.dtype)
+            image = (image - mean) / std
 
         with self._autocast_context(image):
             hidden_state = self.model(pixel_values=image).last_hidden_state

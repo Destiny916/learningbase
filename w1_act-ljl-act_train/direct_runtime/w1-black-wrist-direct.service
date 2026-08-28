@@ -1,0 +1,13 @@
+[Unit]
+Description=W1 direct ACT black wrist image publisher on PC1
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/dexforce/w1/w1_act/start_pc1_black_wrist.sh
+WorkingDirectory=/home/dexforce/w1/w1_act
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

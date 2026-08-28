@@ -456,6 +456,15 @@ def make_policy(
     kwargs = {}
     if ds_meta is not None:
         features = dataset_to_policy_features(ds_meta.features)
+        # ACT camera selection is intentionally explicit; otherwise all
+        # dataset image features are used as before.
+        if getattr(cfg, "camera_keys", None) is not None:
+            selected = set(cfg.camera_keys)
+            features = {
+                key: feat
+                for key, feat in features.items()
+                if feat.type.name != "VISUAL" or key in selected
+            }
     else:
         if not cfg.pretrained_path:
             logging.warning(

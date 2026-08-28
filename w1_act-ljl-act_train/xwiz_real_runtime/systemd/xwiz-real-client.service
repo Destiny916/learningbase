@@ -1,0 +1,13 @@
+[Unit]
+Description=PC2 XWiz continuous real-robot client
+After=network-online.target xwiz-act-server.service
+Wants=xwiz-act-server.service
+
+[Service]
+Type=simple
+ExecStart=/home/dexforce/w1/w1_act/xwiz_real_runtime/start_pc2_runtime.sh
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

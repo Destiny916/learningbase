@@ -1,0 +1,12 @@
+[Unit]
+Description=PC1 XWiz inference manager
+After=network-online.target
+
+[Service]
+Type=simple
+ExecStart=/home/dexforce/w1/w1_act/xwiz_real_runtime/start_pc1_manager.sh
+Restart=on-failure
+RestartSec=2
+
+[Install]
+WantedBy=default.target

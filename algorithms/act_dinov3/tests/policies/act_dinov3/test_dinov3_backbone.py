@@ -74,6 +74,7 @@ def test_shared_backbone_preserves_camera_order_and_accumulates_gradients():
         patch_size=16,
         gradient_checkpointing=False,
         autocast_dtype="float32",
+        apply_image_normalization=False,
     )
     cameras = [torch.full((1, 3, 224, 224), value) for value in (1.0, 2.0, 3.0)]
 
@@ -86,6 +87,26 @@ def test_shared_backbone_preserves_camera_order_and_accumulates_gradients():
     assert model.scale.grad is not None
     assert torch.isfinite(model.scale.grad)
     assert model.scale.grad.abs() > 0
+
+
+def test_shared_backbone_applies_dinov3_imagenet_normalization():
+    from lerobot.policies.act_dinov3.dinov3_backbone import DINOv3SpatialBackbone
+
+    model = TinyDINOv3()
+    backbone = DINOv3SpatialBackbone(
+        model=model,
+        hidden_size=8,
+        num_register_tokens=4,
+        patch_size=16,
+        gradient_checkpointing=False,
+        autocast_dtype="float32",
+        apply_image_normalization=True,
+    )
+
+    backbone(torch.full((1, 3, 224, 224), 0.5))
+
+    expected = torch.tensor([(0.5 - 0.485) / 0.229, (0.5 - 0.456) / 0.224, (0.5 - 0.406) / 0.225])
+    torch.testing.assert_close(model.seen_inputs[-1][0, :, 0, 0], expected)
 
 
 def test_shared_backbone_rejects_invalid_patch_token_count():

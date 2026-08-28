@@ -5,6 +5,8 @@ from __future__ import annotations
 import argparse
 import json
 from pathlib import Path
+import sys
+import types
 from typing import Any, Literal, get_args, get_origin, get_type_hints
 
 import numpy as np
@@ -17,6 +19,7 @@ REQUIRED_CHECKPOINT_FILES = (
     "policy_postprocessor.json",
 )
 EXPECTED_ACTION_SHAPE = (100, 19)
+NORMALIZATION_EPS = 1e-8
 
 
 class CheckpointError(RuntimeError):
@@ -81,13 +84,88 @@ def load_policy_config(
     return config
 
 
+def normalize_observation(
+    observation: dict[str, np.ndarray],
+    stats: dict[str, dict[str, np.ndarray]],
+) -> dict[str, np.ndarray]:
+    batch: dict[str, np.ndarray] = {}
+    for key, value in observation.items():
+        if key not in stats:
+            raise CheckpointError(f"normalization stats missing feature: {key}")
+        array = np.asarray(value)
+        if key.startswith("observation.images."):
+            if array.ndim != 3 or array.shape[-1] != 3:
+                raise CheckpointError(f"image feature {key} must be HWC RGB")
+            array = array.astype(np.float32) / 255.0
+            array = np.transpose(array, (2, 0, 1))
+        else:
+            array = array.astype(np.float32)
+        mean = np.asarray(stats[key]["mean"], dtype=np.float32)
+        std = np.asarray(stats[key]["std"], dtype=np.float32)
+        batch[key] = ((array - mean) / (std + NORMALIZATION_EPS))[None, ...]
+    return batch
+
+
+def unnormalize_action_chunk(
+    actions: Any,
+    stats: dict[str, dict[str, np.ndarray]],
+) -> np.ndarray:
+    array = np.asarray(actions, dtype=np.float32)
+    if array.shape == (1, *EXPECTED_ACTION_SHAPE):
+        array = array[0]
+    action_stats = stats.get("action")
+    if action_stats is None:
+        raise CheckpointError("normalization stats missing feature: action")
+    mean = np.asarray(action_stats["mean"], dtype=np.float32)
+    std = np.asarray(action_stats["std"], dtype=np.float32)
+    return validate_action_chunk(array * std + mean)
+
+
+def load_normalization_stats(path: str | Path) -> dict[str, dict[str, np.ndarray]]:
+    from safetensors import safe_open
+
+    grouped: dict[str, dict[str, np.ndarray]] = {}
+    with safe_open(str(path), framework="np") as tensors:
+        for key in tensors.keys():
+            feature, separator, statistic = key.rpartition(".")
+            if separator and statistic in {"mean", "std"}:
+                grouped.setdefault(feature, {})[statistic] = tensors.get_tensor(key)
+    missing = [
+        feature
+        for feature, values in grouped.items()
+        if "mean" not in values or "std" not in values
+    ]
+    if missing:
+        raise CheckpointError(f"incomplete normalization stats: {', '.join(missing)}")
+    return grouped
+
+
+def install_lerobot_inference_import_shims() -> None:
+    """Avoid importing unrelated policy, training, teleop and dataset stacks."""
+    import lerobot
+
+    lerobot_root = Path(lerobot.__file__).resolve().parent
+    policies = types.ModuleType("lerobot.policies")
+    policies.__path__ = [str(lerobot_root / "policies")]
+    policies.__package__ = "lerobot.policies"
+    sys.modules["lerobot.policies"] = policies
+
+    train = types.ModuleType("lerobot.configs.train")
+    train.TrainPipelineConfig = type("TrainPipelineConfig", (), {})
+    sys.modules["lerobot.configs.train"] = train
+
+    policy_utils = types.ModuleType("lerobot.policies.utils")
+    policy_utils.log_model_loading_keys = lambda _missing, _unexpected: None
+    sys.modules["lerobot.policies.utils"] = policy_utils
+
+
 class LeRobotActRuntime:
     def __init__(self, policy_path: str | Path, device: str = "cuda"):
         self.policy_path = validate_checkpoint(policy_path)
 
         import torch
+        install_lerobot_inference_import_shims()
         from lerobot.policies.act.modeling_act import ACTPolicy
-        from lerobot.processor import PolicyProcessorPipeline
 
         if device.startswith("cuda") and not torch.cuda.is_available():
             raise CheckpointError(f"CUDA device requested but unavailable: {device}")
@@ -104,48 +182,27 @@ class LeRobotActRuntime:
             strict=True,
         )
         self.policy.to(self.device).eval()
-
-        self.preprocessor = PolicyProcessorPipeline.from_pretrained(
-            self.policy_path,
-            config_filename="policy_preprocessor.json",
-            local_files_only=True,
+        self.input_stats = load_normalization_stats(
+            self.policy_path / "policy_preprocessor_step_3_normalizer_processor.safetensors"
         )
-        self.postprocessor = PolicyProcessorPipeline.from_pretrained(
-            self.policy_path,
-            config_filename="policy_postprocessor.json",
-            local_files_only=True,
+        self.output_stats = load_normalization_stats(
+            self.policy_path / "policy_postprocessor_step_0_unnormalizer_processor.safetensors"
         )
-        self._place_processors()
         self.reset()
-
-    def _place_processors(self) -> None:
-        for step in getattr(self.preprocessor, "steps", []):
-            if step.__class__.__name__ == "DeviceProcessorStep":
-                step.device = str(self.device)
-            elif step.__class__.__name__ == "NormalizerProcessorStep" and hasattr(step, "to"):
-                step.to(device=self.device)
-        for step in getattr(self.postprocessor, "steps", []):
-            if step.__class__.__name__ == "DeviceProcessorStep":
-                step.device = "cpu"
-            elif step.__class__.__name__ == "UnnormalizerProcessorStep" and hasattr(step, "to"):
-                step.to(device="cpu")
 
     def reset(self) -> None:
         self.policy.reset()
 
     def predict(self, observation: dict[str, np.ndarray]) -> np.ndarray:
-        from lerobot.policies.utils import prepare_observation_for_inference
-        from lerobot.utils.constants import ACTION
-
-        observation_t = prepare_observation_for_inference(observation, self.device)
-        batch = self.preprocessor(observation_t)
+        batch_np = normalize_observation(observation, self.input_stats)
+        batch = {
+            key: self.torch.from_numpy(value).to(self.device)
+            for key, value in batch_np.items()
+        }
         with self.torch.inference_mode():
             normalized = self.policy.predict_action_chunk(batch)
-            processed = self.postprocessor({ACTION: normalized})
-        action = processed[ACTION] if isinstance(processed, dict) else processed
-        if hasattr(action, "detach"):
-            action = action.detach().cpu().numpy()
-        return validate_action_chunk(action)
+        actions = normalized.detach().cpu().numpy()
+        return unnormalize_action_chunk(actions, self.output_stats)
 
 
 def _synthetic_observation() -> dict[str, np.ndarray]:

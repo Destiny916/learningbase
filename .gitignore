@@ -3,6 +3,7 @@
 .worktrees/
 .idea/
 .vscode/
+.tmp_*
 
 # Python/runtime artifacts
 __pycache__/
@@ -25,6 +26,7 @@ runs/
 outputs/
 wandb/
 checkpoints/
+logs/
 *.safetensors
 *.pt
 *.pth
@@ -32,6 +34,9 @@ checkpoints/
 
 # Existing model weights are intentionally not imported into this repository.
 /act_popcorn_45w/
+
+# Local vendor manual used as audit reference; keep it out of Git.
+/docs/W1 Pro 使用手册 V0.4.0/
 
 # W1 source is tracked, while generated/runtime artifacts remain local.
 /w1_act-ljl-act_train/**/checkpoints/
@@ -44,3 +49,13 @@ checkpoints/
 /w1_act-ljl-act_train/dist/
 /w1_act-ljl-act_train/release/
 /w1_act-ljl-act_train/deb-contents.txt
+act_popcorn_45w_xwiz.zip
+.gitignore
+.gitignore
+act_popcorn_45w.zip
+docs/W1_Pro_整机系统代码与操作逻辑审计.md
+docs/w1_camera_check/双目相机与默认位置检查.md
+docs/w1_camera_check/w1_left_eye.jpg
+docs/w1_camera_check/w1_right_eye.jpg
+howtotrain/W1_遥操使用说明.md
+howtotrain/W1机器人操作与数据回放手册.md

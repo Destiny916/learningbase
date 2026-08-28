@@ -140,6 +140,9 @@ class CosineDecayWithWarmupSchedulerConfig(LRSchedulerConfig):
     num_decay_steps: int
     peak_lr: float
     decay_lr: float
+    # Preserve the existing behavior for other policies. ACT-DINOv3 opts in
+    # when decay_steps is defined as the end of the full warmup-plus-decay run.
+    decay_after_warmup: bool = False
 
     def build(self, optimizer: Optimizer, num_training_steps: int) -> LambdaLR:
         # Auto-scale scheduler parameters if training steps are shorter than configured decay steps
@@ -168,8 +171,13 @@ class CosineDecayWithWarmupSchedulerConfig(LRSchedulerConfig):
                 return (1 / (actual_warmup_steps + 1) - 1) * frac + 1
 
             def cosine_decay_schedule(current_step):
-                step = min(current_step, actual_decay_steps)
-                cosine_decay = 0.5 * (1 + math.cos(math.pi * step / actual_decay_steps))
+                if self.decay_after_warmup:
+                    decay_span = max(1, actual_decay_steps - actual_warmup_steps)
+                    step = min(max(current_step - actual_warmup_steps, 0), decay_span)
+                else:
+                    decay_span = max(1, actual_decay_steps)
+                    step = min(current_step, decay_span)
+                cosine_decay = 0.5 * (1 + math.cos(math.pi * step / decay_span))
                 alpha = self.decay_lr / self.peak_lr
                 decayed = (1 - alpha) * cosine_decay + alpha
                 return decayed

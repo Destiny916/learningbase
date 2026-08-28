@@ -11,6 +11,8 @@
 # WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
 # See the License for the specific language governing permissions and
 # limitations under the License.
+import math
+
 import pytest
 import torch
 from packaging.version import Version
@@ -94,6 +96,46 @@ def test_cosine_decay_with_warmup_scheduler(optimizer):
         expected_state_dict["_is_initial"] = False
 
     assert scheduler.state_dict() == expected_state_dict
+
+
+def test_cosine_decay_starts_at_peak_after_warmup(optimizer):
+    base_lr = optimizer.param_groups[0]["lr"]
+    config = CosineDecayWithWarmupSchedulerConfig(
+        num_warmup_steps=2,
+        num_decay_steps=10,
+        peak_lr=0.01,
+        decay_lr=0.001,
+        decay_after_warmup=True,
+    )
+    scheduler = config.build(optimizer, num_training_steps=10)
+
+    for _ in range(2):
+        optimizer.step()
+        scheduler.step()
+
+    assert scheduler.get_last_lr() == pytest.approx([base_lr])
+
+    for _ in range(8):
+        optimizer.step()
+        scheduler.step()
+
+    assert scheduler.get_last_lr() == pytest.approx([base_lr * 0.1])
+
+
+def test_cosine_decay_preserves_legacy_start_when_not_opted_in(optimizer):
+    base_lr = optimizer.param_groups[0]["lr"]
+    config = CosineDecayWithWarmupSchedulerConfig(
+        num_warmup_steps=2, num_decay_steps=10, peak_lr=0.01, decay_lr=0.001
+    )
+    scheduler = config.build(optimizer, num_training_steps=10)
+
+    for _ in range(2):
+        optimizer.step()
+        scheduler.step()
+
+    expected_factor = 0.1 + 0.9 * 0.5 * (1 + math.cos(math.pi * 2 / 10))
+    expected = base_lr * expected_factor
+    assert scheduler.get_last_lr() == pytest.approx([expected])
 
 
 def test_save_scheduler_state(scheduler, tmp_path):

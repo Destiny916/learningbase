@@ -26,7 +26,7 @@ import torch
 import torch.distributed as dist
 import yaml
 
-from prismatic.conf import VLAConfig, VLARegistry
+from prismatic.conf import VLAConfig, VLARegistry, W1VLAConfig
 from prismatic.models import load_vla
 from prismatic.overwatch import initialize_overwatch
 from prismatic.training import VLAMetrics, get_fsdp_strategy
@@ -217,11 +217,7 @@ class TrainConfig:
     # fmt: off
 
     # VLAConfig (`prismatic/conf/vla.py`); override with --vla.type `VLARegistry.<VLA>.vla_id`
-    vla: VLAConfig = field(
-        default_factory=VLAConfig.get_choice_class(
-            VLARegistry.JEPAVLA_QWEN25_VJEPA_224PX_0_5B_W1.vla_id
-        )
-    )
+    vla: W1VLAConfig = field(default_factory=W1VLAConfig)
 
     # Directory Paths
     data_root_dir: Path = Path(                                     # Path to Open-X dataset directory

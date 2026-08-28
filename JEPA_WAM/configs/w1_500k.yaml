@@ -1,0 +1,13 @@
+vla:
+  type: jepavla-qwen25-vjepa-224px+0_5b+w1
+  w1_dataset_root: /data/datasets/popcorn/0827_lerobot_v30_action_nextstate
+  w1_state_q01_q99: /data/models/jepa_wam_w1/stats/state_q01_q99.json
+  w1_action_q01_q99: /data/models/jepa_wam_w1/stats/action_q01_q99.json
+  vjepa_checkpoint_path: /data/models/jepa_wam_w1/vjepa2/vjepa2_1_vitl_dist_vitG_384.pt
+  base_vlm: /data/models/jepa_wam_w1/JEPA_WAM/checkpoints/pretrained_vlm/prism-qwen25-vjepa21-vitl-384px+0_5b+stage-finetune+x7
+run_root_dir: /data/runs
+llm_checkpoint_path: /data/models/jepa_wam_w1/Qwen2.5-0.5B
+run_id: w1_jepa_wam_500k_gpu5
+save_interval: 20000
+trackers: [jsonl]
+use_swanlab: false

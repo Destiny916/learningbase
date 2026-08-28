@@ -219,7 +219,7 @@ class TrainConfig:
     # VLAConfig (`prismatic/conf/vla.py`); override with --vla.type `VLARegistry.<VLA>.vla_id`
     vla: VLAConfig = field(
         default_factory=VLAConfig.get_choice_class(
-            VLARegistry.JEPAVLA_QWEN25_VJEPA_224PX_0_5B_LIBERO_90.vla_id
+            VLARegistry.JEPAVLA_QWEN25_VJEPA_224PX_0_5B_W1.vla_id
         )
     )
 

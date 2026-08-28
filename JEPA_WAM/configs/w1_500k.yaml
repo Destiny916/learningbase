@@ -1,5 +1,4 @@
 vla:
-  type: jepavla-qwen25-vjepa-224px+0_5b+w1
   w1_dataset_root: /data/datasets/popcorn/0827_lerobot_v30_action_nextstate
   w1_state_q01_q99: /data/models/jepa_wam_w1/stats/state_q01_q99.json
   w1_action_q01_q99: /data/models/jepa_wam_w1/stats/action_q01_q99.json

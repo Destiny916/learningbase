@@ -72,6 +72,7 @@ class W1VLAConfig(VLAConfig):
     max_steps: int = 500_000
     global_batch_size: int = 32
     per_device_batch_size: int = 32
+    expected_world_size: int = 1
     learning_rate: float = 1e-5
     min_learning_rate: float = 1e-6
     weight_decay: float = 1e-4

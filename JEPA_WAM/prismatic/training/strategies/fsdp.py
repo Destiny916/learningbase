@@ -197,7 +197,7 @@ class FSDPStrategy(TrainingStrategy):
             for group in groups
         ]
 
-        self.optimizer = AdamW(optimizer_groups, lr=self.learning_rate)
+        self.optimizer = AdamW(optimizer_groups, lr=self.learning_rate, betas=(0.9, 0.999), eps=1e-8)
         if any(group["min_lr"] > 0 for group in optimizer_groups):
             self.lr_scheduler = get_cosine_schedule_with_warmup_and_group_min_lrs(
                 self.optimizer,

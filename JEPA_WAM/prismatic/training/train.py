@@ -361,6 +361,9 @@ def train(cfg: TrainConfig) -> None:
             action_token_id=151386,
             placeholder_tokens=cfg.vla.flow_gr00t_placeholder_tokens,
             action_horizon=cfg.vla.action_horizon,
+            num_workers=cfg.vla.num_workers,
+            prefetch_factor=cfg.vla.prefetch_factor,
+            persistent_workers=cfg.vla.persistent_workers,
         )
     else:
         overwatch.info(f"Creating LIBERO RLDS dataset: mixture={cfg.vla.data_mix}")

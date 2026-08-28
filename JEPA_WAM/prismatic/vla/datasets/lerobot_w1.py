@@ -244,10 +244,13 @@ class LeRobotW1Dataset:
 class W1LeRobotTorchDataset(IterableDataset):
     """Iterable JEPA-WAM dataset backed by the installed LeRobot v3 reader."""
 
-    dataloader_num_workers = 0
+    dataloader_num_workers = 16
     dataloader_pin_memory = True
+    dataloader_prefetch_factor = 4
+    dataloader_persistent_workers = True
 
-    def __init__(self, root: str, state_q01, state_q99, action_q01, action_q99, contract=None):
+    def __init__(self, root: str, state_q01, state_q99, action_q01, action_q99, contract=None,
+                 num_workers: int = 16, prefetch_factor: int = 4, persistent_workers: bool = True):
         try:
             from lerobot.datasets.lerobot_dataset import LeRobotDataset
         except ImportError as exc:  # pragma: no cover
@@ -257,6 +260,9 @@ class W1LeRobotTorchDataset(IterableDataset):
 
         self.root = Path(root).expanduser().resolve()
         self.contract = contract or W1DataContract()
+        self.dataloader_num_workers = num_workers
+        self.dataloader_prefetch_factor = prefetch_factor
+        self.dataloader_persistent_workers = persistent_workers
         with (self.root / "meta" / "info.json").open(encoding="utf-8") as handle:
             info = json.load(handle)
         validate_w1_info(info, self.contract)

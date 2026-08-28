@@ -61,6 +61,9 @@ def get_w1_dataset_and_collator(
     action_token_id: int,
     placeholder_tokens: int,
     action_horizon: int = 20,
+    num_workers: int = 16,
+    prefetch_factor: int = 4,
+    persistent_workers: bool = True,
 ):
     import json
 
@@ -73,6 +76,8 @@ def get_w1_dataset_and_collator(
     dataset = W1LeRobotTorchDataset(
         str(data_root_dir), state_q01, state_q99, action_q01, action_q99,
         contract=W1DataContract(action_horizon=action_horizon),
+        num_workers=num_workers, prefetch_factor=prefetch_factor,
+        persistent_workers=persistent_workers,
     )
     collator = W1Collator(
         tokenizer,

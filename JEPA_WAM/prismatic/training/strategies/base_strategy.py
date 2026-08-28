@@ -261,7 +261,7 @@ class TrainingStrategy(ABC):
         if dataloader_num_workers > 0:
             dataloader_kwargs.update(
                 prefetch_factor=getattr(vla_dataset, "dataloader_prefetch_factor", 2),
-                persistent_workers=True,
+                persistent_workers=getattr(vla_dataset, "dataloader_persistent_workers", True),
             )
         dataloader = DataLoader(**dataloader_kwargs)
         overwatch.info(

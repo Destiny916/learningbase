@@ -179,6 +179,7 @@ class FlowMatchingActionHead(nn.Module):
         vl_embs: torch.Tensor,
         proprio: torch.Tensor,
         action_gt: torch.Tensor,
+        action_valid_mask: torch.Tensor | None = None,
         **_: object,
     ):
         compute_dtype = vl_embs.dtype
@@ -193,7 +194,15 @@ class FlowMatchingActionHead(nn.Module):
 
         t_discretized = (t[:, 0, 0] * self.num_timestep_buckets).long()
         pred_actions = self._predict_velocity(vl_embs, noisy_trajectory, t_discretized, state)
-        loss = ((pred_actions - velocity) ** 2).mean()
+        error = (pred_actions - velocity) ** 2
+        if action_valid_mask is not None:
+            mask = action_valid_mask.to(device=error.device, dtype=error.dtype)
+            if mask.ndim == 2:
+                mask = mask.unsqueeze(-1)
+            error = error * mask
+            loss = error.sum() / mask.sum().clamp_min(1.0) / error.shape[-1]
+        else:
+            loss = error.mean()
         return loss, pred_actions
 
     @torch.no_grad()

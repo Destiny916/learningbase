@@ -246,6 +246,7 @@ class PrismaticVLM(VLM):
         pair_pixel_values: Optional[Union[torch.FloatTensor, Dict[str, torch.Tensor]]] = None,
         actions: Optional[torch.FloatTensor] = None,
         proprio: Optional[torch.FloatTensor] = None,
+        action_valid_mask: Optional[torch.Tensor] = None,
     ) -> dict:
         """Run the fixed JEPA-WAM action and visual-alignment forward pass."""
         if input_ids.ndim != 2 or attention_mask.shape != input_ids.shape:
@@ -346,6 +347,7 @@ class PrismaticVLM(VLM):
                 action_memory,
                 proprio,
                 actions,
+                action_valid_mask=action_valid_mask,
             )
             total_loss = total_loss + loss_action
 

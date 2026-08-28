@@ -70,8 +70,8 @@ class W1VLAConfig(VLAConfig):
     d_proprio: int = 19
     action_horizon: int = 20
     max_steps: int = 500_000
-    global_batch_size: int = 32
-    per_device_batch_size: int = 32
+    global_batch_size: int = 16
+    per_device_batch_size: int = 16
     expected_world_size: int = 1
     learning_rate: float = 1e-5
     min_learning_rate: float = 1e-6

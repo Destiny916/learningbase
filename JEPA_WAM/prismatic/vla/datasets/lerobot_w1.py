@@ -183,6 +183,10 @@ class LeRobotW1Dataset:
             "state": {"q01": self.state_q01.tolist(), "q99": self.state_q99.tolist()},
             "action": {"q01": self.action_q01.tolist(), "q99": self.action_q99.tolist()},
         }
+        self.dataset_statistics = {
+            "state": {"q01": self.state_q01.tolist(), "q99": self.state_q99.tolist()},
+            "action": {"q01": self.action_q01.tolist(), "q99": self.action_q99.tolist()},
+        }
         if self.state_q01.shape != (self.contract.state_dim,) or self.state_q99.shape != self.state_q01.shape:
             raise ValueError("state q01/q99 must both be 19D")
         if self.action_q01.shape != (self.contract.action_dim,) or self.action_q99.shape != self.action_q01.shape:
@@ -288,6 +292,8 @@ class W1LeRobotTorchDataset(IterableDataset):
         self.state_q99 = np.asarray(state_q99, dtype=np.float32)
         self.action_q01 = np.asarray(action_q01, dtype=np.float32)
         self.action_q99 = np.asarray(action_q99, dtype=np.float32)
+        self.dataset_statistics = {"state": {"q01": self.state_q01.tolist(), "q99": self.state_q99.tolist()},
+                                   "action": {"q01": self.action_q01.tolist(), "q99": self.action_q99.tolist()}}
 
     def __len__(self):
         return len(self.dataset)

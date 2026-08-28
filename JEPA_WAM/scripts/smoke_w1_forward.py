@@ -5,7 +5,7 @@ from types import SimpleNamespace
 import json
 import torch
 
-from prismatic.training.train import build_vla_from_base_vlm
+from prismatic.models.materialize import get_llm_backbone_and_tokenizer, get_vision_backbone_and_transform, get_vlm
 from prismatic.vla.materialize import get_w1_dataset_and_collator
 
 base = Path(__import__('os').environ['W1_BASE_VLM'])
@@ -24,7 +24,19 @@ vla = SimpleNamespace(
 )
 cfg = SimpleNamespace(vla=vla, llm_checkpoint_path=Path(__import__('os').environ['W1_QWEN']))
 torch.cuda.set_device(0)
-model = build_vla_from_base_vlm(base, cfg, None).cuda()
+with open(base / 'config.json') as f: model_cfg = json.load(f)['model']
+ckpt = torch.load(base / 'checkpoints/latest-checkpoint.pt', map_location='cpu', weights_only=False)['model']
+vision, _ = get_vision_backbone_and_transform(model_cfg['vision_backbone_id'], model_cfg['image_resize_strategy'], checkpoint_path=vla.vjepa_checkpoint_path)
+llm, _ = get_llm_backbone_and_tokenizer(model_cfg['llm_backbone_id'], llm_max_length=model_cfg.get('llm_max_length', 32768), inference_mode=False, custom_hf_path=str(cfg.llm_checkpoint_path))
+model = get_vlm(model_cfg['model_id'], model_cfg['arch_specifier'], vision, llm, enable_mixed_precision_training=False,
+    d_action=19, d_proprio=19, action_horizon=20, fm_hidden_size=1024, fm_num_layers=16,
+    fm_num_inference_timesteps=4, fm_num_timestep_buckets=1000, fm_noise_beta_alpha=1.5,
+    fm_noise_beta_beta=1.0, fm_noise_s=0.999, fm_num_target_vision_tokens=32,
+    fm_add_pos_embed=True, fm_max_seq_len=1024, fm_state_dropout=0.5,
+    flow_gr00t_placeholder_tokens=64, lambda_visual_token_cosine=0.5, d_jepa=vision.embed_dim)
+model.llm_backbone.load_state_dict(ckpt['llm_backbone'])
+model.projector.load_state_dict(ckpt['projector'])
+model = model.to(dtype=torch.float32).cuda()
 model.train()
 with open(state_stats) as f: sq = json.load(f)
 with open(action_stats) as f: aq = json.load(f)

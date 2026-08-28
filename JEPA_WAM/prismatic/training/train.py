@@ -33,7 +33,14 @@ from prismatic.training import VLAMetrics, get_fsdp_strategy
 from prismatic.util import set_global_seed
 from prismatic.vla import get_vla_dataset_and_collator
 from prismatic.vla.materialize import get_w1_dataset_and_collator
-from prismatic.vla.datasets.rlds.utils.data_utils import save_dataset_statistics
+try:
+    from prismatic.vla.datasets.rlds.utils.data_utils import save_dataset_statistics
+except ModuleNotFoundError as exc:
+    if exc.name != "dlimp":
+        raise
+    def save_dataset_statistics(dataset_statistics, run_dir):
+        with open(Path(run_dir) / "dataset_statistics.json", "w") as handle:
+            json.dump(dataset_statistics, handle, indent=2)
 
 from peft import LoraConfig, get_peft_model
 # Sane Defaults

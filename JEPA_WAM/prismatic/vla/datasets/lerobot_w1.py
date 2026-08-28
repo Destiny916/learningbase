@@ -13,6 +13,12 @@ from typing import Any, Mapping
 
 import numpy as np
 
+try:
+    from torch.utils.data import IterableDataset
+except ImportError:  # pragma: no cover - allows host-side contract tests without torch
+    class IterableDataset:  # type: ignore[no-redef]
+        pass
+
 W1_ACTION_HORIZON = 20
 W1_STATE_DIM = 19
 W1_ACTION_DIM = 19
@@ -233,3 +239,121 @@ class LeRobotW1Dataset:
                     ),
                     "image_keys": self.contract.image_keys,
                 }
+
+
+class W1LeRobotTorchDataset(IterableDataset):
+    """Iterable JEPA-WAM dataset backed by the installed LeRobot v3 reader."""
+
+    dataloader_num_workers = 0
+    dataloader_pin_memory = True
+
+    def __init__(self, root: str, state_q01, state_q99, action_q01, action_q99, contract=None):
+        try:
+            from lerobot.datasets.lerobot_dataset import LeRobotDataset
+        except ImportError as exc:  # pragma: no cover
+            raise RuntimeError("Install LeRobot and expose its src directory via PYTHONPATH") from exc
+        import json
+        from pathlib import Path
+
+        self.root = Path(root).expanduser().resolve()
+        self.contract = contract or W1DataContract()
+        with (self.root / "meta" / "info.json").open(encoding="utf-8") as handle:
+            info = json.load(handle)
+        validate_w1_info(info, self.contract)
+        self.fps = float(info["fps"])
+        delta = {"action": [i / self.fps for i in range(self.contract.action_horizon)]}
+        delta.update({key: [0.0, self.contract.pair_target_offset / self.fps] for key in self.contract.image_keys})
+        self.dataset = LeRobotDataset(
+            repo_id="local/popcorn_0827_w1",
+            root=self.root,
+            download_videos=False,
+            return_uint8=True,
+            delta_timestamps=delta,
+        )
+        self.state_q01 = np.asarray(state_q01, dtype=np.float32)
+        self.state_q99 = np.asarray(state_q99, dtype=np.float32)
+        self.action_q01 = np.asarray(action_q01, dtype=np.float32)
+        self.action_q99 = np.asarray(action_q99, dtype=np.float32)
+
+    def __len__(self):
+        return len(self.dataset)
+
+    def __iter__(self):
+        for index in range(len(self.dataset)):
+            item = self.dataset[index]
+            raw_state = item["observation.state"].numpy()
+            frame = int(item["frame_index"])
+            if frame == 0:
+                state_rep = relative_state_representation(raw_state[None])[0]
+            else:
+                previous = self.dataset[index - 1]
+                previous_state = previous["observation.state"].numpy()
+                if int(previous["episode_index"]) != int(item["episode_index"]):
+                    state_rep = relative_state_representation(raw_state[None])[0]
+                else:
+                    state_rep = raw_state.copy()
+                    state_rep[W1_RELATIVE_JOINT_INDICES] -= previous_state[W1_RELATIVE_JOINT_INDICES]
+            action_abs = item["action"].numpy()
+            action_rep = relative_action_representation(action_abs, raw_state)
+            action_is_pad = item.get("action_is_pad")
+            valid = (
+                ~action_is_pad.numpy()
+                if action_is_pad is not None
+                else np.ones(action_rep.shape[0], dtype=bool)
+            )
+            yield {
+                "pixel_values_raw": {key: item[key] for key in self.contract.image_keys},
+                "pair_pixel_values_raw": {key: item[key] for key in self.contract.image_keys},
+                "input_text": item.get("task", "W1 robot manipulation"),
+                "state": normalize_with_quantiles(state_rep, self.state_q01, self.state_q99),
+                "action": normalize_with_quantiles(action_rep, self.action_q01, self.action_q99),
+                "action_valid_mask": valid,
+                "episode_index": int(item["episode_index"]),
+                "frame_index": frame,
+            }
+
+
+class W1Collator:
+    """Convert W1 raw samples into the tensors expected by PrismaticVLM."""
+
+    def __init__(self, tokenizer, image_transform, prompt_builder_fn, action_token_id: int, placeholder_tokens: int = 64):
+        self.tokenizer = tokenizer
+        self.image_transform = image_transform
+        self.prompt_builder_fn = prompt_builder_fn
+        self.action_token_id = action_token_id
+        self.placeholder_tokens = placeholder_tokens
+
+    @staticmethod
+    def _to_pil(value):
+        from PIL import Image
+
+        array = value.permute(1, 2, 0).cpu().numpy() if hasattr(value, "permute") else np.asarray(value)
+        return Image.fromarray(array.astype(np.uint8), mode="RGB")
+
+    def __call__(self, instances):
+        import torch
+        from torch.nn.utils.rnn import pad_sequence
+
+        input_ids = []
+        current_images, pair_images = [], []
+        for instance in instances:
+            prompt = self.prompt_builder_fn("openvla")
+            prompt.add_turn("human", f"What action should the robot take to {instance['input_text'].lower()}?")
+            prompt.add_turn("gpt", "")
+            ids = self.tokenizer(prompt.get_prompt(), add_special_tokens=True).input_ids
+            ids.extend([self.action_token_id] * self.placeholder_tokens)
+            input_ids.append(torch.tensor(ids, dtype=torch.long))
+
+            current_images.append(torch.stack([self.image_transform(self._to_pil(instance["pixel_values_raw"][key][0])) for key in W1_IMAGE_KEYS]))
+            pair_images.append(torch.stack([torch.stack([self.image_transform(self._to_pil(frame)) for frame in instance["pair_pixel_values_raw"][key]]) for key in W1_IMAGE_KEYS]))
+
+        ids = pad_sequence(input_ids, batch_first=True, padding_value=self.tokenizer.pad_token_id)
+        return {
+            "input_ids": ids,
+            "attention_mask": ids.ne(self.tokenizer.pad_token_id),
+            "pixel_values": torch.stack(current_images),
+            "pair_pixel_values": torch.stack(pair_images),
+            "actions": torch.stack([torch.as_tensor(x["action"], dtype=torch.float32) for x in instances]),
+            "proprio": torch.stack([torch.as_tensor(x["state"], dtype=torch.float32) for x in instances]),
+            "action_valid_mask": torch.stack([torch.as_tensor(x["action_valid_mask"], dtype=torch.bool) for x in instances]),
+        }

@@ -32,6 +32,7 @@ from prismatic.overwatch import initialize_overwatch
 from prismatic.training import VLAMetrics, get_fsdp_strategy
 from prismatic.util import set_global_seed
 from prismatic.vla import get_vla_dataset_and_collator
+from prismatic.vla.materialize import get_w1_dataset_and_collator
 from prismatic.vla.datasets.rlds.utils.data_utils import save_dataset_statistics
 
 from peft import LoraConfig, get_peft_model
@@ -346,19 +347,35 @@ def train(cfg: TrainConfig) -> None:
     log_module_parameter_breakdown(vlm)
 
     # Get VLA Dataset & Collator
-    overwatch.info(f"Creating LIBERO RLDS dataset: mixture={cfg.vla.data_mix}")
-    vla_dataset, collator = get_vla_dataset_and_collator(
-        cfg.data_root_dir,
-        cfg.vla.data_mix,
-        image_transform=vlm.vision_backbone.get_image_transform(),
-        tokenizer=vlm.llm_backbone.get_tokenizer(),
-        prompt_builder_fn=vlm.llm_backbone.prompt_builder_fn,
-        default_image_resolution=vlm.vision_backbone.default_image_resolution,
-        shuffle_buffer_size=cfg.vla.shuffle_buffer_size,
-        visual_token_pair_offset=cfg.vla.visual_token_pair_offset,
-        target_action_dim=cfg.vla.d_action,
-        target_proprio_dim=cfg.vla.d_proprio,
-    )
+    if cfg.vla.data_mix == "lerobot_w1":
+        if not all((cfg.vla.w1_dataset_root, cfg.vla.w1_state_q01_q99, cfg.vla.w1_action_q01_q99)):
+            raise ValueError("W1 training requires w1_dataset_root and separate state/action q01-q99 files")
+        overwatch.info("Creating W1 LeRobot dataset: root=%s", cfg.vla.w1_dataset_root)
+        vla_dataset, collator = get_w1_dataset_and_collator(
+            cfg.vla.w1_dataset_root,
+            image_transform=vlm.vision_backbone.get_image_transform(),
+            tokenizer=vlm.llm_backbone.get_tokenizer(),
+            prompt_builder_fn=vlm.llm_backbone.prompt_builder_fn,
+            state_q01_q99=cfg.vla.w1_state_q01_q99,
+            action_q01_q99=cfg.vla.w1_action_q01_q99,
+            action_token_id=151386,
+            placeholder_tokens=cfg.vla.flow_gr00t_placeholder_tokens,
+            action_horizon=cfg.vla.action_horizon,
+        )
+    else:
+        overwatch.info(f"Creating LIBERO RLDS dataset: mixture={cfg.vla.data_mix}")
+        vla_dataset, collator = get_vla_dataset_and_collator(
+            cfg.data_root_dir,
+            cfg.vla.data_mix,
+            image_transform=vlm.vision_backbone.get_image_transform(),
+            tokenizer=vlm.llm_backbone.get_tokenizer(),
+            prompt_builder_fn=vlm.llm_backbone.prompt_builder_fn,
+            default_image_resolution=vlm.vision_backbone.default_image_resolution,
+            shuffle_buffer_size=cfg.vla.shuffle_buffer_size,
+            visual_token_pair_offset=cfg.vla.visual_token_pair_offset,
+            target_action_dim=cfg.vla.d_action,
+            target_proprio_dim=cfg.vla.d_proprio,
+        )
 
     global_dataset_length = getattr(vla_dataset, "global_dataset_length", len(vla_dataset))
     overwatch.info(

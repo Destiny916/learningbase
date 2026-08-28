@@ -1,1 +1,1 @@
-from .vla import VLAConfig, VLARegistry
+from .vla import VLAConfig, VLARegistry, W1VLAConfig

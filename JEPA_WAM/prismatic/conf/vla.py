@@ -60,12 +60,28 @@ class VLAConfig(ChoiceRegistry):
     reduce_in_full_precision: bool = True
 
 
+@dataclass
+class W1VLAConfig(VLAConfig):
+    """DexForce W1 override: LeRobot v3.0, 19D state/action, 20-step chunks."""
+
+    vla_id: str = "jepavla-qwen25-vjepa-224px+0_5b+w1"
+    data_mix: str = "lerobot_w1"
+    d_action: int = 19
+    d_proprio: int = 19
+    action_horizon: int = 20
+    visual_token_pair_offset: int = 31
+    w1_dataset_root: Optional[Path] = None
+    w1_state_q01_q99: Optional[Path] = None
+    w1_action_q01_q99: Optional[Path] = None
+
+
 Exp_JEPAVLA_Qwen25_VJEPA_0_5B_LIBERO_90 = VLAConfig
 
 
 @unique
 class VLARegistry(Enum):
     JEPAVLA_QWEN25_VJEPA_224PX_0_5B_LIBERO_90 = VLAConfig
+    JEPAVLA_QWEN25_VJEPA_224PX_0_5B_W1 = W1VLAConfig
 
     @property
     def vla_id(self) -> str:
@@ -73,3 +89,4 @@ class VLARegistry(Enum):
 
 
 VLAConfig.register_subclass(VLAConfig.vla_id, VLAConfig)
+VLAConfig.register_subclass(W1VLAConfig.vla_id, W1VLAConfig)

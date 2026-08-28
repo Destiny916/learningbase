@@ -11,6 +11,7 @@ from prismatic.models.backbones.vision import ImageTransform
 from prismatic.util.data_utils import PaddedCollatorForActionPrediction
 from prismatic.vla.constants import NUM_TOKENS
 from prismatic.vla.datasets import RLDSDataset, VLABatchTransform
+from prismatic.vla.datasets.lerobot_w1 import W1Collator, W1DataContract, W1LeRobotTorchDataset
 
 
 def get_vla_dataset_and_collator(
@@ -46,5 +47,38 @@ def get_vla_dataset_and_collator(
         resize_resolution=default_image_resolution[1:],
         shuffle_buffer_size=shuffle_buffer_size,
         visual_token_pair_offset=visual_token_pair_offset,
+    )
+    return dataset, collator
+
+
+def get_w1_dataset_and_collator(
+    data_root_dir: Path,
+    image_transform,
+    tokenizer,
+    prompt_builder_fn,
+    state_q01_q99: Path,
+    action_q01_q99: Path,
+    action_token_id: int,
+    placeholder_tokens: int,
+    action_horizon: int = 20,
+):
+    import json
+
+    def read_quantiles(path: Path):
+        payload = json.loads(path.read_text(encoding="utf-8"))
+        return payload["q01"], payload["q99"]
+
+    state_q01, state_q99 = read_quantiles(state_q01_q99)
+    action_q01, action_q99 = read_quantiles(action_q01_q99)
+    dataset = W1LeRobotTorchDataset(
+        str(data_root_dir), state_q01, state_q99, action_q01, action_q99,
+        contract=W1DataContract(action_horizon=action_horizon),
+    )
+    collator = W1Collator(
+        tokenizer,
+        image_transform,
+        prompt_builder_fn,
+        action_token_id=action_token_id,
+        placeholder_tokens=placeholder_tokens,
     )
     return dataset, collator

@@ -5,6 +5,7 @@ Core class definition for a strategy implementing Torch native Fully Sharded Dat
 fine-grained control over wrapping policies and mixed precision per component).
 """
 
+import gc
 import math
 import shutil
 from collections import OrderedDict
@@ -39,6 +40,16 @@ from prismatic.training.strategies.base_strategy import (
 
 # Initialize Overwatch =>> Wraps `logging.Logger`
 overwatch = initialize_overwatch(__name__)
+
+
+def release_checkpoint_memory(*state_dicts: Optional[dict]) -> None:
+    """Drop checkpoint tensor references before the next training forward."""
+    for state_dict in state_dicts:
+        if state_dict is not None:
+            state_dict.clear()
+    gc.collect()
+    if torch.cuda.is_available():
+        torch.cuda.empty_cache()
 
 
 class FSDPStrategy(TrainingStrategy):
@@ -101,32 +112,38 @@ class FSDPStrategy(TrainingStrategy):
         """Save a checkpoint to the `run_dir` only containing the state_dicts for trainable parameters by default."""
         assert isinstance(self.vlm, FSDP), "FSDPStrategy.save_checkpoint assumes VLM is already wrapped in FSDP!"
 
-        # Summon Full State Dictionary =>> Reconstitute from Shards
-        with FSDP.state_dict_type(self.vlm, self.fsdp_state_dict_type, self.fsdp_save_policy):
-            full_vlm_state_dict = self.vlm.state_dict()
-            model_state_dicts = {
-                mkey: OrderedDict() for mkey in (self.trainable_module_keys if only_trainable else self.all_module_keys)
-            }
+        full_vlm_state_dict = None
+        model_state_dicts = None
+        try:
+            # Summon Full State Dictionary =>> Reconstitute from Shards
+            with FSDP.state_dict_type(self.vlm, self.fsdp_state_dict_type, self.fsdp_save_policy):
+                full_vlm_state_dict = self.vlm.state_dict()
+                model_state_dicts = {
+                    mkey: OrderedDict()
+                    for mkey in (self.trainable_module_keys if only_trainable else self.all_module_keys)
+                }
 
-            # Iterate through `full_vlm_state_dict` and split `mkey.{full_dotted_path}` -> `mkey: {full_dotted_path}`
-            for key, param in full_vlm_state_dict.items():
-                for mkey in model_state_dicts:
-                    if key.startswith(mprefix := f"{mkey}."):
-                        model_state_dicts[mkey][key.removeprefix(mprefix)] = param
+                # Iterate through `full_vlm_state_dict` and split `mkey.{full_dotted_path}` -> `mkey: {full_dotted_path}`
+                for key, param in full_vlm_state_dict.items():
+                    for mkey in model_state_dicts:
+                        if key.startswith(mprefix := f"{mkey}."):
+                            model_state_dicts[mkey][key.removeprefix(mprefix)] = param
 
-            # Save on rank zero *only*
-            if overwatch.is_rank_zero():
-                checkpoint_dir = run_dir / "checkpoints"
-                if train_loss is None:
-                    checkpoint_path = checkpoint_dir / f"step-{global_step:06d}-epoch-{epoch:02d}-loss=inf.pt"
-                else:
-                    checkpoint_path = (
-                        checkpoint_dir / f"step-{global_step:06d}-epoch-{epoch:02d}-loss={train_loss:.4f}.pt"
-                    )
+                # Save on rank zero *only*
+                if overwatch.is_rank_zero():
+                    checkpoint_dir = run_dir / "checkpoints"
+                    if train_loss is None:
+                        checkpoint_path = checkpoint_dir / f"step-{global_step:06d}-epoch-{epoch:02d}-loss=inf.pt"
+                    else:
+                        checkpoint_path = (
+                            checkpoint_dir / f"step-{global_step:06d}-epoch-{epoch:02d}-loss={train_loss:.4f}.pt"
+                        )
 
-                # Save Checkpoint & Copy Latest to `latest-checkpoint.pt`
-                torch.save({"model": model_state_dicts}, checkpoint_path)
-                shutil.copy(checkpoint_path, checkpoint_dir / "latest-checkpoint.pt")
+                    # Save Checkpoint & Copy Latest to `latest-checkpoint.pt`
+                    torch.save({"model": model_state_dicts}, checkpoint_path)
+                    shutil.copy(checkpoint_path, checkpoint_dir / "latest-checkpoint.pt")
+        finally:
+            release_checkpoint_memory(full_vlm_state_dict, model_state_dicts)
 
     def run_setup(self, run_dir: Path, n_train_examples: int) -> None:
         # Iteratively Assemble FSDP Wrapping Policy by fetching the wrapping policies for each backbone/constituent

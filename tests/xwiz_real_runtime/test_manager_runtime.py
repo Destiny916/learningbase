@@ -50,28 +50,28 @@ def test_resolved_simulation_config_is_one_chunk_and_simulation_tagged():
     )
 
     assert client["mode"] == 1
-    assert client["max_steps"] == 100
+    assert client["max_steps"] == 16
     assert client["home_position"] == ""
     assert server["data_type"] == "simulation"
-    assert server["action_horizon"] == 100
+    assert server["action_horizon"] == 16
 
 
 def test_resolved_real_config_is_one_chunk_and_real_tagged():
     client, server = prepare_resolved_configs({}, {"data_type": "simulation"}, mode=2)
 
     assert client["mode"] == 2
-    assert client["action_horizon"] == 100
+    assert client["action_horizon"] == 16
     assert client["sample_factor"] == 1.0
     assert client["chunk_size_threshold"] == 0.0
     assert server["data_type"] == "real"
-    assert server["action_horizon"] == 100
+    assert server["action_horizon"] == 16
 
 
 def test_resolved_continuous_real_config_preserves_continuous_execution():
     client, server = prepare_resolved_configs(
         {
             "execution_mode": "continuous",
-            "max_steps": 100,
+            "max_steps": 16,
             "server_host": "192.168.20.21",
             "server_port": 8889,
         },
@@ -80,7 +80,7 @@ def test_resolved_continuous_real_config_preserves_continuous_execution():
     )
 
     assert client["execution_mode"] == "continuous"
-    assert client["max_steps"] > 100
+    assert client["max_steps"] > 16
     assert client["server_host"] == "192.168.20.21"
     assert client["server_port"] == 8889
     assert server["data_type"] == "real"

@@ -1,6 +1,6 @@
 {
   "client_config": {
-    "action_horizon": 100,
+    "action_horizon": 16,
     "chunk_size_threshold": 0.0,
     "collect_frequency": 10,
     "control_frequency": 10,
@@ -14,11 +14,11 @@
     "hand_target_size": [640, 360],
     "mode": 2
   },
-  "description": "W1真机：部署后立即推理并执行一个100帧ACT动作块",
+    "description": "W1真机：部署后立即推理并执行一个16帧ACT动作块",
   "instruction": "1123",
   "last_updated": 1787291897365,
   "max_duration": 10,
-  "name": "ACT Popcorn 真机100帧",
+    "name": "ACT Popcorn 真机16帧",
   "server_config": {
     "data_type": "real",
     "inverse_gripper": false,

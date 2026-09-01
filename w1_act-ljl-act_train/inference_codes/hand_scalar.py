@@ -14,6 +14,7 @@ from std_msgs.msg import Float64
 
 
 HAND_GESTURES = {
+    # PC1 order: T_MCP, T_CMC_YAW, IF, MF, RF, LF.
     "normal": [0.0, 70.0, 0.0, 0.0, 0.0, 0.0],
     "normal2": [0.0, 100.0, 0.0, 0.0, 0.0, 0.0],
     "cup": [0.0, 100.0, 35.0, 45.0, 47.0, 37.0],
@@ -30,8 +31,8 @@ HAND_GESTURES = {
 }
 
 HAND_JOINT_NAMES = [
-    "T_CMC_YAW",
     "T_MCP",
+    "T_CMC_YAW",
     "IF_MCP_PITCH",
     "MF_MCP_PITCH",
     "RF_MCP_PITCH",

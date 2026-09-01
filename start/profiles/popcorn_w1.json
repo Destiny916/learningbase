@@ -1,0 +1,37 @@
+{
+  "profile_name": "popcorn_w1_generic_baseline",
+  "pc1": {"host": "192.168.20.20", "w1_act_root": "/home/dexforce/w1/w1_act"},
+  "pc2": {"host": "192.168.20.21", "workspace_root": "/home/dexforce/workspace"},
+  "ros": {"distribution": "humble", "domain_id": 20, "rmw": "rmw_cyclonedds_cpp"},
+  "ports": {"model_220000": 8889, "manager_220000": 8890, "model_180000": 8892, "manager_180000": 8891, "model_500000": 8889, "manager_500000": 8890},
+  "models": {
+    "220000": "/home/dexforce/workspace/outputs/220000_pc2",
+    "180000": "/home/dexforce/workspace/outputs/act_dinov3_popcorn_0827_19d_relative_arm_joints_nextstate_chunk16_b64_500k_gpu1_2_180000_pc2",
+    "500000": "/home/dexforce/workspace/outputs/500000_pc2"
+  },
+  "topics": {
+    "joint_feedback": "/feedback/robot_server_state",
+    "joint_control": "/control/joint_position",
+    "left_hand_feedback": "/feedback/ee/left",
+    "right_hand_feedback": "/feedback/ee/right",
+    "left_hand_control": "/control/ee/left",
+    "right_hand_control": "/control/ee/right",
+    "physical_left_wrist": "/camera_r/color/image_rect_raw",
+    "physical_right_wrist": "/camera_l/color/image_rect_raw",
+    "head_right": "/camera/right_eye_resize"
+  },
+  "robot_contract": {
+    "robot_order": ["ANKLE", "KNEE", "BUTTOCK", "WAIST", "NECK1", "NECK2", "LEFT_J1", "LEFT_J2", "LEFT_J3", "LEFT_J4", "LEFT_J5", "LEFT_J6", "LEFT_J7", "RIGHT_J1", "RIGHT_J2", "RIGHT_J3", "RIGHT_J4", "RIGHT_J5", "RIGHT_J6", "RIGHT_J7"],
+    "model_order": ["WAIST", "LEFT_J1", "LEFT_J2", "LEFT_J3", "LEFT_J4", "LEFT_J5", "LEFT_J6", "LEFT_J7", "NECK1", "NECK2", "RIGHT_J1", "RIGHT_J2", "RIGHT_J3", "RIGHT_J4", "RIGHT_J5", "RIGHT_J6", "RIGHT_J7", "LEFT_GRIPPER", "RIGHT_GRIPPER"],
+    "act_default_hand": [0, 70, 0, 0, 0, 0],
+    "left_closed_hand": [0, 100, 35, 45, 47, 37],
+    "right_closed_hand": [65, 100, 70, 75, 100, 100]
+  },
+  "cameras": {
+    "left_wrist_serial": "412622271335",
+    "right_wrist_serial": "412622273406",
+    "left_wrist_raw_hw": [360, 640],
+    "right_wrist_raw_hw": [480, 640],
+    "head_raw_hw": [540, 960]
+  }
+}

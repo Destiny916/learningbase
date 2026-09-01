@@ -10,7 +10,7 @@ import numpy as np
 
 IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 360
-ACTION_SHAPE = (100, 19)
+ACTION_SHAPE = (16, 19)
 
 STATE_GROUPS = (
     ("waistqpos", 1),
@@ -22,7 +22,6 @@ STATE_GROUPS = (
 )
 
 IMAGE_MAPPING = {
-    "cam_high": "observation.images.cam_high_left",
     "cam_left_wrist": "observation.images.cam_hand_left",
     "cam_right_wrist": "observation.images.cam_hand_right",
 }
@@ -53,17 +52,17 @@ def assemble_state(states: Mapping[str, Any]) -> np.ndarray:
 
 def decode_bgr_image(data: bytes, target_size: tuple[int, int], key: str) -> np.ndarray:
     size = tuple(int(value) for value in target_size)
-    if size != (IMAGE_WIDTH, IMAGE_HEIGHT):
+    if size[0] < 1 or size[1] < 1:
         raise ContractError(
             f"{key} target size must be {(IMAGE_WIDTH, IMAGE_HEIGHT)}, got {size}"
         )
-    expected_bytes = IMAGE_WIDTH * IMAGE_HEIGHT * 3
+    expected_bytes = size[0] * size[1] * 3
     if not isinstance(data, (bytes, bytearray, memoryview)) or len(data) != expected_bytes:
         actual = len(data) if hasattr(data, "__len__") else None
         raise ContractError(
-            f"{key} must contain {expected_bytes} BGR bytes, got {actual}"
+            f"{key} must contain {expected_bytes} BGR bytes for {size}, got {actual}"
         )
-    bgr = np.frombuffer(data, dtype=np.uint8).reshape(IMAGE_HEIGHT, IMAGE_WIDTH, 3)
+    bgr = np.frombuffer(data, dtype=np.uint8).reshape(size[1], size[0], 3)
     return bgr[..., ::-1].copy()
 
 
@@ -72,11 +71,21 @@ def decode_observation(request: Mapping[str, Any]) -> dict[str, np.ndarray]:
     if not isinstance(states, Mapping):
         raise ContractError("states must be a mapping")
     observation = {"observation.state": assemble_state(states)}
+    # outputs/500000 was trained from the physical right head camera.  The
+    # client sends both head views; retain the old cam_high fallback for peers
+    # that only send one view.
+    head_key = "cam_high_r" if "cam_high_r" in request else "cam_high"
+    head_training_key = "observation.images.cam_high_right" if head_key == "cam_high_r" else "observation.images.cam_high_left"
+    if head_key not in request:
+        raise ContractError(f"missing image: {head_key}")
+    observation[head_training_key] = decode_bgr_image(
+        request[head_key], request.get("head_target_size", (IMAGE_WIDTH, IMAGE_HEIGHT)), head_key
+    )
     for legacy_key, training_key in IMAGE_MAPPING.items():
         if legacy_key not in request:
             raise ContractError(f"missing image: {legacy_key}")
-        size_key = "head_target_size" if legacy_key == "cam_high" else "hand_target_size"
-        size = request.get(size_key, (IMAGE_WIDTH, IMAGE_HEIGHT))
+        size_key = "hand_left_target_size" if legacy_key == "cam_left_wrist" else "hand_right_target_size"
+        size = request.get(size_key, request.get("hand_target_size", (IMAGE_WIDTH, IMAGE_HEIGHT)))
         observation[training_key] = decode_bgr_image(request[legacy_key], size, legacy_key)
     return observation
 

@@ -1,6 +1,6 @@
 {
   "client_config": {
-    "action_horizon": 100,
+    "action_horizon": 16,
     "chunk_size_threshold": 0.0,
     "collect_frequency": 10,
     "control_frequency": 10,
@@ -15,7 +15,7 @@
     "hand_target_size": [640, 360],
     "mode": 2
   },
-  "description": "W1真机：完整执行每个100帧动作块，再按最新观测生成下一块，直到人工停止",
+    "description": "W1真机：完整执行每个16帧动作块，再按最新观测生成下一块，直到人工停止",
   "instruction": "1123",
   "max_duration": 900719925474099,
   "name": "ACT Popcorn 真机无限连续（PC2推理）",

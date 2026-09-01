@@ -1,18 +1,21 @@
-# 转换发现
+# Findings
 
-- `/data/popcorn/0827` 当前保留 50 个完整 episode（0–49），每个有四路 JPEG、metadata、pose、VR JSONL。
-- 四路相机均约 30 FPS；目标应从 metadata 按时间戳对齐到 `head/right` 时间轴，再取最近/线性插值姿态。
-- 源 pose 每帧包含身体、双手 6D 和两个 gripper；目标 19D 只取 17 个身体关节加两个 gripper。
-- 需要确认本地 LeRobot `LeRobotDataset.create(..., use_videos=True)` 的 v3.1 API 及视频编码依赖。
-- 用户确认可继续使用 LeRobot v3.0；本地 `lerobot` 0.6.1 的 `CODEBASE_VERSION` 为 `v3.0`。
-- 输出时间轴采用每个 episode 的 `head/right` metadata；左右腕部图像按最近时间戳匹配，姿态按时间戳逐维线性插值，超出 pose 边界时端点夹紧。
-- 三路视频 feature 为 `observation.images.cam_high_right`、`observation.images.cam_hand_left`、`observation.images.cam_hand_right`；对应源图分别为 1920x1080、640x360、640x360 RGB，输出均为 224x224。
-- 用户补充预处理：`head/right` 居中上下补黑边到 1920x1920 后 resize 224x224；两路 wrist 先 resize 360x360，再 resize 224x224。
-- 正式转换使用 H.264 `ultrafast`、CRF 23，避免默认 SVT-AV1 编码过慢；数据语义和视频尺寸不变。
-- `observation.state` 与 `action` 都保存 19D 绝对值；源数据没有独立 action 轨迹，不能凭空制造未来 action。
-- 正式输出 `/data/popcorn/0827_lerobot_v30` 已完成：50 episodes / 95,725 frames / LeRobot v3.0。
-- 三路视频均为 H.264、224x224、30 FPS，每路视频头信息帧数合计均为 95,725。
-- 全量 parquet state/action 均为 `(95725, 19)`、全部 finite、逐元素完全相等；episode/global/frame index 连续正确。
-- episode 0、7、25、49 重新按源 pose 时间戳插值后与输出最大误差均为 0.0。
-- 开头、中间、末尾三组视频抽样与源预处理图的归一化 MAE 为 0.00477–0.01452；头部上下 40 行黑边均小于 0.00005。
-- LeRobot 会保留空的 `images/<feature>` 目录；正确验收条件是目录中没有临时图片文件，而不是要求 `images/` 目录不存在。
+Record only verified facts for the 160000 ACT-DINOv3 dry-run.
+
+- Old 500000 PC2 service is stopped; PC1 remains idle and no real inference is active.
+- Checkpoint is ACT-DINOv3, 16x19, with relative arm indices 1..7 and 10..16; waist, neck and grippers indices 0,8,9,17,18 remain absolute.
+- Preprocessor performs online arm state delta and q01/q99 normalization; postprocessor unnormalizes then reconstructs absolute arm targets from the chunk anchor.
+- Checkpoint config contains EE/FK training-only metadata not declared by the current ACTDINOv3Config; minimal compatibility fields were added.
+- Exact q01/q99 stats were found on the training server. Manifest format is v4, horizon 16, source is the 0827 next-state dataset, and all absolute/gripper indices match the checkpoint.
+- Strict checkpoint loading requires source commit `c8c674b` and Transformers `5.12.1`; current repository HEAD and PC2's original Transformers are not checkpoint-compatible.
+- The exact deployment copy is `outputs/160000_pc2`, with the matching stats bundled under `relative_stats` and PC2 path references written into its config.
+- The prior rsync session completed all three transfers: exact source, pinned runtime dependencies, and the 160000 deployment checkpoint/stats.
+- PC2 is Jetson aarch64/L4T R36.4.3 with CUDA-enabled Torch 2.8 on Python 3.10; checkpoint source declares Python >=3.12, but all files compile under 3.10 and its only unavailable `typing` names are `Self` and `Unpack`, both available from `typing_extensions`.
+- The initial runtime bundle contained only Transformers 5.12.1. PC2 needed isolated overlays for Hub 1.20.1, Tokenizers 0.22.2, Gymnasium 1.3.0, and Termcolor 3.2.0. System packages were not overwritten.
+- PC2 exact source tree checksum over non-pycache `src` files matches local: `65a65e94d6a29a4b81051635cf83706cd4513d3d80935d103d55d43197f7b123`.
+- PC2 strict GPU load passed with 343,814,885 parameters, `chunk_size=16`, and `n_action_steps=16`.
+- Fresh read-only capture timestamp `1788165140950895092` was Idle. The 19D input grippers reconstructed from Linker feedback were left `98.9855`, right `94.1234`.
+- Dry-run image binding and conversion were: head `/camera/right_eye_resize` 960x540 -> centered black-pad 960x960 -> 224x224; model left wrist <- physical left `/camera_r` 640x360 -> 360x360 -> 224x224; model right wrist <- physical right `/camera_l` 640x480 -> 480x480 -> 224x224.
+- Full preprocessor/model/postprocessor dry-run passed: first online relative arm state is zero, absolute indices 0/8/9/17/18 stay absolute, normalized state matches clipped q01/q99, raw and postprocessed outputs are finite 16x19, and inverse q01/q99 plus arm-anchor reconstruction matches numerically.
+- The produced chunk had zero body-limit violations before runtime clipping. Raw grippers were left `100.02..101.03`, right `96.37..99.20`; runtime clamps left to 100 and `<95 -> 0` does not close either hand for this chunk.
+- Final artifacts are on PC2 at `/home/dexforce/workspace/dryruns/160000_current/output`; model service remains inactive and port 8889 has no listener.

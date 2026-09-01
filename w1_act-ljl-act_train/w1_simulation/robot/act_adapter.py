@@ -13,6 +13,7 @@ from w1_simulation.robot.joints import ACT_STATE_JOINTS, BODY_JOINTS, HAND_POSIT
 
 @dataclass(frozen=True)
 class ActHandGestureConfig:
+    # Public/PC1 order: T_MCP, T_CMC_YAW, IF, MF, RF, LF.
     left_gripper_0: tuple[float, ...] = (0.0, 100.0, 35.0, 45.0, 47.0, 37.0)
     left_gripper_100: tuple[float, ...] = (0.0, 70.0, 0.0, 0.0, 0.0, 0.0)
     right_gripper_0: tuple[float, ...] = (65.0, 100.0, 70.0, 75.0, 100.0, 100.0)
@@ -107,7 +108,10 @@ class W1ActAdapter:
 
     @staticmethod
     def gesture_percent(scalar: float, closed: tuple[float, ...], opened: tuple[float, ...]) -> np.ndarray:
-        open_fraction = float(np.clip(scalar, 0.0, 100.0)) / 100.0
+        value = float(scalar)
+        if not np.isfinite(value):
+            raise ValueError("gripper openness must be finite")
+        open_fraction = float(np.clip(value, 0.0, 100.0)) / 100.0
         return (
             np.asarray(closed, dtype=np.float64) * (1.0 - open_fraction)
             + np.asarray(opened, dtype=np.float64) * open_fraction
@@ -124,10 +128,12 @@ class W1ActAdapter:
             raise ValueError("ACT action contains non-finite values")
         clipped_body = np.clip(values[: len(BODY_JOINTS)], self.body_lower, self.body_upper)
         left_hand = self.gesture_percent(
-            values[-2], self.gestures.left_gripper_0, self.gestures.left_gripper_100
+            0.0 if values[-2] < 95.0 else values[-2],
+            self.gestures.left_gripper_0, self.gestures.left_gripper_100
         )
         right_hand = self.gesture_percent(
-            values[-1], self.gestures.right_gripper_0, self.gestures.right_gripper_100
+            0.0 if values[-1] < 95.0 else values[-1],
+            self.gestures.right_gripper_0, self.gestures.right_gripper_100
         )
         return W1PositionCommand(
             body=BodyPositionCommand(

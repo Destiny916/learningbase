@@ -111,9 +111,12 @@ class ClientConfig(InferenceConfig):
     use_hand_camera: bool = True
     head_target_size: Tuple[int, int] = (640, 360)
     hand_target_size: Tuple[int, int] = (640, 480)
+    hand_left_target_size: Tuple[int, int] = (640, 360)
+    hand_right_target_size: Tuple[int, int] = (640, 480)
 
     # 推理参数：动作/模型
     action_horizon: int = 32
+    execution_mode: str = "single"
     time_infer: float = 0.0
     chunk_size_threshold: float = 0.0
     use_td: bool = False
@@ -132,7 +135,7 @@ ClientConfig.FIELD_NAMES = tuple(ClientConfig.__dataclass_fields__.keys())
 ClientConfig.RUNTIME_NAMES = (
     "server_host", "server_port",
     "control_frequency", "collect_frequency", "max_steps",
-    "head_target_size", "hand_target_size", "action_horizon",
+    "head_target_size", "hand_target_size", "hand_left_target_size", "hand_right_target_size", "action_horizon",
     "use_hand_camera", "end_effector_type", "end_effector_position_limit",
     "time_infer", "chunk_size_threshold", "sample_factor",
     "prompt", "mode", "use_td",

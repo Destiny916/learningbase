@@ -25,6 +25,18 @@ class ACTDINOv3Config(ACTConfig):
     scheduler_warmup_steps: int = 25_000
     scheduler_decay_steps: int = 500_000
     scheduler_decay_lr: float = 1e-6
+    # Training-only auxiliary EE/FK metadata kept in saved checkpoints.
+    # Declaring these fields preserves config compatibility during inference;
+    # they do not alter the 19D ACT action head.
+    ee_pose_loss_weight: float = 0.0
+    fk_loss_weight: float = 0.0
+    kinematics_urdf_path: str | None = None
+    kinematics_urdf_sha256: str | None = None
+    ee_reference_link: str | None = None
+    ee_left_link: str | None = None
+    ee_right_link: str | None = None
+    ee_position_scale_m: float = 0.1
+    ee_rotation_loss_weight: float = 0.0
 
     def __post_init__(self) -> None:
         super().__post_init__()

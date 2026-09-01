@@ -301,8 +301,9 @@ class OptimizedRobotClient(Node):
         except Exception as e:
             self.get_logger().warn(f"cv_bridge left-hand fail: {e}")
             return
+        size = getattr(self.cfg, "hand_left_target_size", self.cfg.hand_target_size)
         bgr = cv2.resize(
-            bgr, (self.cfg.hand_target_size[0], self.cfg.hand_target_size[1]),
+            bgr, (size[0], size[1]),
             interpolation=cv2.INTER_AREA
         )
         t = now_sec()
@@ -317,8 +318,9 @@ class OptimizedRobotClient(Node):
         except Exception as e:
             self.get_logger().warn(f"cv_bridge right-hand fail: {e}")
             return
+        size = getattr(self.cfg, "hand_right_target_size", self.cfg.hand_target_size)
         bgr = cv2.resize(
-            bgr, (self.cfg.hand_target_size[0], self.cfg.hand_target_size[1]),
+            bgr, (size[0], size[1]),
             interpolation=cv2.INTER_AREA
         )
         t = now_sec()
@@ -1296,6 +1298,8 @@ class OptimizedRobotClient(Node):
                 "start_infer": self.start_infer,
                 "head_target_size": self.cfg.head_target_size,
                 "hand_target_size": self.cfg.hand_target_size,
+                "hand_left_target_size": getattr(self.cfg, "hand_left_target_size", self.cfg.hand_target_size),
+                "hand_right_target_size": getattr(self.cfg, "hand_right_target_size", self.cfg.hand_target_size),
                 "time_infer": self.cfg.time_infer,
                 CommonKey.END_EFFECTOR_LIMIT.value: self.cfg.end_effector_position_limit,
                 CommonKey.INSTRUCTION.value: [self.cfg.prompt]

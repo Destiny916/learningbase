@@ -6,7 +6,7 @@ import json
 from pathlib import Path
 from typing import Any, Mapping
 
-from .runtime import prepare_client_config
+from .runtime import ACTION_HORIZON, prepare_client_config
 
 
 LEROBOT_CAMERA_FEATURES = (
@@ -55,7 +55,7 @@ def prepare_resolved_configs(
     client = prepare_client_config(client_config, mode)
     server = dict(server_config)
     server["data_type"] = "simulation" if mode == 1 else "real"
-    server["action_horizon"] = 100
+    server["action_horizon"] = ACTION_HORIZON
     return client, server
 
 

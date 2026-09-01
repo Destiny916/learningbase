@@ -10,6 +10,9 @@ import types
 from typing import Any, Literal, get_args, get_origin, get_type_hints
 
 import numpy as np
+from PIL import Image
+
+from .checkpoint_converter import resample_action_chunk
 
 
 REQUIRED_CHECKPOINT_FILES = (
@@ -18,7 +21,7 @@ REQUIRED_CHECKPOINT_FILES = (
     "policy_preprocessor.json",
     "policy_postprocessor.json",
 )
-EXPECTED_ACTION_SHAPE = (100, 19)
+EXPECTED_ACTION_SHAPE = (16, 19)
 NORMALIZATION_EPS = 1e-8
 
 
@@ -40,17 +43,78 @@ def validate_checkpoint(policy_path: str | Path) -> Path:
     return path
 
 
-def validate_action_chunk(actions: Any) -> np.ndarray:
+def validate_action_chunk(actions: Any, expected_horizon: int = EXPECTED_ACTION_SHAPE[0]) -> np.ndarray:
     array = np.asarray(actions, dtype=np.float32)
-    if array.shape == (1, *EXPECTED_ACTION_SHAPE):
+    expected_shape = (expected_horizon, EXPECTED_ACTION_SHAPE[1])
+    if array.shape == (1, *expected_shape):
         array = array[0]
-    if array.shape != EXPECTED_ACTION_SHAPE:
+    if array.shape != expected_shape:
         raise CheckpointError(
-            f"model action chunk must have shape {EXPECTED_ACTION_SHAPE}, got {array.shape}"
+            f"model action chunk must have shape {expected_shape}, got {array.shape}"
         )
     if not np.isfinite(array).all():
         raise CheckpointError("model action chunk must contain finite values")
     return array
+
+
+def resample_runtime_action_chunk(
+    actions: Any, *, source_horizon: int, target_horizon: int = EXPECTED_ACTION_SHAPE[0]
+) -> np.ndarray:
+    try:
+        converted = resample_action_chunk(actions, target_horizon)
+    except ValueError as exc:
+        raise CheckpointError(str(exc)) from exc
+    if converted.shape[0] != target_horizon or converted.shape[1] != EXPECTED_ACTION_SHAPE[1]:
+        raise CheckpointError(f"converted action chunk has invalid shape: {converted.shape}")
+    if int(source_horizon) != np.asarray(actions).shape[0]:
+        raise CheckpointError(
+            f"checkpoint declared source horizon {source_horizon}, got {np.asarray(actions).shape[0]}"
+        )
+    return converted
+
+
+def adapt_observation_to_policy(
+    observation: dict[str, np.ndarray], input_features: dict[str, Any]
+) -> dict[str, np.ndarray]:
+    adapted = dict(observation)
+    # The wire contract names the physical left head camera; some checkpoints
+    # call the same feature cam_high_right. Preserve the checkpoint's key.
+    if (
+        "observation.images.cam_high_left" in adapted
+        and "observation.images.cam_high_left" not in input_features
+        and "observation.images.cam_high_right" in input_features
+    ):
+        adapted["observation.images.cam_high_right"] = adapted.pop(
+            "observation.images.cam_high_left"
+        )
+    return adapted
+
+
+def preprocess_observation_image(
+    image: np.ndarray, key: str, feature_shape: tuple[int, int, int] | list[int]
+) -> np.ndarray:
+    """Apply the deterministic Popcorn image conversion used during training."""
+    channels, height, width = (int(value) for value in feature_shape)
+    if channels != 3:
+        raise CheckpointError(f"image feature {key} must have 3 channels")
+    array = np.asarray(image, dtype=np.uint8)
+    if array.ndim != 3 or array.shape[-1] != 3:
+        raise CheckpointError(f"image feature {key} must be HWC RGB")
+    pil = Image.fromarray(array, mode="RGB")
+    if key == "observation.images.cam_high_right":
+        side = max(pil.width, pil.height)
+        canvas = Image.new("RGB", (side, side), (0, 0, 0))
+        canvas.paste(pil, ((side - pil.width) // 2, (side - pil.height) // 2))
+        pil = canvas
+    elif key in {"observation.images.cam_hand_left", "observation.images.cam_hand_right"}:
+        # The deployed wrist cameras have different native aspect ratios:
+        # physical left wrist is 640x360 and physical right wrist is 640x480.
+        # Training-time conversion stretches each image to a square using its
+        # corresponding source side, then resizes to the model feature size.
+        side = max(pil.width, pil.height)
+        pil = pil.resize((side, side), Image.Resampling.LANCZOS)
+    pil = pil.resize((width, height), Image.Resampling.LANCZOS)
+    return np.asarray(pil, dtype=np.uint8)
 
 
 def _draccus_decoder(config_class: Any, raw: dict[str, Any]) -> Any:
@@ -87,6 +151,7 @@ def load_policy_config(
 def normalize_observation(
     observation: dict[str, np.ndarray],
     stats: dict[str, dict[str, np.ndarray]],
+    feature_shapes: dict[str, Any] | None = None,
 ) -> dict[str, np.ndarray]:
     batch: dict[str, np.ndarray] = {}
     for key, value in observation.items():
@@ -96,6 +161,8 @@ def normalize_observation(
         if key.startswith("observation.images."):
             if array.ndim != 3 or array.shape[-1] != 3:
                 raise CheckpointError(f"image feature {key} must be HWC RGB")
+            if feature_shapes and key in feature_shapes:
+                array = preprocess_observation_image(array, key, feature_shapes[key]["shape"])
             array = array.astype(np.float32) / 255.0
             array = np.transpose(array, (2, 0, 1))
         else:
@@ -109,16 +176,18 @@ def normalize_observation(
 def unnormalize_action_chunk(
     actions: Any,
     stats: dict[str, dict[str, np.ndarray]],
+    expected_horizon: int = EXPECTED_ACTION_SHAPE[0],
 ) -> np.ndarray:
     array = np.asarray(actions, dtype=np.float32)
-    if array.shape == (1, *EXPECTED_ACTION_SHAPE):
+    expected_shape = (expected_horizon, EXPECTED_ACTION_SHAPE[1])
+    if array.shape == (1, *expected_shape):
         array = array[0]
     action_stats = stats.get("action")
     if action_stats is None:
         raise CheckpointError("normalization stats missing feature: action")
     mean = np.asarray(action_stats["mean"], dtype=np.float32)
     std = np.asarray(action_stats["std"], dtype=np.float32)
-    return validate_action_chunk(array * std + mean)
+    return validate_action_chunk(array * std + mean, expected_horizon=expected_horizon)
 
 
 def load_normalization_stats(path: str | Path) -> dict[str, dict[str, np.ndarray]]:
@@ -182,6 +251,11 @@ class LeRobotActRuntime:
             strict=True,
         )
         self.policy.to(self.device).eval()
+        self.source_horizon = int(getattr(policy_config, "chunk_size", 0))
+        if self.source_horizon < 1:
+            raise CheckpointError("checkpoint must declare a positive chunk_size")
+        with (self.policy_path / "config.json").open() as stream:
+            self.input_features = json.load(stream).get("input_features", {})
         self.input_stats = load_normalization_stats(
             self.policy_path / "policy_preprocessor_step_3_normalizer_processor.safetensors"
         )
@@ -194,7 +268,8 @@ class LeRobotActRuntime:
         self.policy.reset()
 
     def predict(self, observation: dict[str, np.ndarray]) -> np.ndarray:
-        batch_np = normalize_observation(observation, self.input_stats)
+        observation = adapt_observation_to_policy(observation, self.input_features)
+        batch_np = normalize_observation(observation, self.input_stats, self.input_features)
         batch = {
             key: self.torch.from_numpy(value).to(self.device)
             for key, value in batch_np.items()
@@ -202,7 +277,15 @@ class LeRobotActRuntime:
         with self.torch.inference_mode():
             normalized = self.policy.predict_action_chunk(batch)
         actions = normalized.detach().cpu().numpy()
-        return unnormalize_action_chunk(actions, self.output_stats)
+        source_actions = unnormalize_action_chunk(
+            actions, self.output_stats, expected_horizon=self.source_horizon
+        )
+        if self.source_horizon != EXPECTED_ACTION_SHAPE[0]:
+            raise CheckpointError(
+                f"checkpoint chunk_size must be {EXPECTED_ACTION_SHAPE[0]} for direct execution, "
+                f"got {self.source_horizon}"
+            )
+        return validate_action_chunk(source_actions, expected_horizon=self.source_horizon)
 
 
 def _synthetic_observation() -> dict[str, np.ndarray]:

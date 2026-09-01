@@ -1,0 +1,13 @@
+[Unit]
+Description=W1 ACT-DINOv3 220000 isolated model server
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+WorkingDirectory=/home/dexforce/w1/w1_act
+ExecStart=/home/dexforce/w1/w1_act/direct_runtime/start_pc2_act_dinov3_220000.sh
+Restart=no
+
+[Install]
+WantedBy=multi-user.target

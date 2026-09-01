@@ -1,0 +1,17 @@
+{
+  "profile_name": "new_w1_fill_after_hardware_audit",
+  "inherit_from": "popcorn_w1",
+  "notes": [
+    "IP、路径、ROS 域、RMW、话题、关节顺序、限位和端口按当前 W1 通用基线保留；若新设备不同，必须显式修改。",
+    "相机序列号、原始分辨率、末端执行器关节名和默认姿态必须由现场只读检查确认。",
+    "模型目录必须逐项核对 config.json、权重、归一化统计和输入特征。"
+  ],
+  "overrides": {
+    "pc1_host": "192.168.20.20",
+    "pc2_host": "192.168.20.21",
+    "pc1_w1_act_root": "/home/dexforce/w1/w1_act",
+    "pc2_workspace_root": "/home/dexforce/workspace",
+    "left_wrist_serial": "REPLACE_WITH_RS_SERIAL",
+    "right_wrist_serial": "REPLACE_WITH_RS_SERIAL"
+  }
+}

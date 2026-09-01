@@ -15,6 +15,7 @@ from xwiz_real_runtime.runtime import (
     feedback_positions_by_name,
     gripper_scalars_from_feedback,
     hand_command_from_openness,
+    hand_command_to_wire,
     mode_topics,
     normalize_hand_feedback,
     prepare_client_config,
@@ -32,6 +33,11 @@ def test_zero_is_closed_and_one_hundred_is_open_for_each_hand():
     assert np.allclose(hand_command_from_openness(100, LEFT_CLOSED, LEFT_OPEN), LEFT_OPEN)
     assert np.allclose(hand_command_from_openness(0, RIGHT_CLOSED, RIGHT_OPEN), RIGHT_CLOSED)
     assert np.allclose(hand_command_from_openness(100, RIGHT_CLOSED, RIGHT_OPEN), RIGHT_OPEN)
+
+
+def test_hand_commands_are_reordered_for_pc1_wire_protocol():
+    # PC1 v0.4.6 Linker_L6 uses the same canonical order as the ACT bridge.
+    assert hand_command_to_wire((100, 0, 35, 45, 47, 37)) == (100, 0, 35, 45, 47, 37)
 
 
 def test_hand_mapping_clips_range_and_interpolates_each_joint():
@@ -59,7 +65,7 @@ def test_linker_feedback_is_reordered_by_name_not_message_position():
         type("Joint", (), {"name": "LF_MCP_PITCH", "position": 60.0})(),
     ]
 
-    assert feedback_positions_by_name(states) == (20.0, 10.0, 30.0, 40.0, 50.0, 60.0)
+    assert feedback_positions_by_name(states) == (10.0, 20.0, 30.0, 40.0, 50.0, 60.0)
 
 
 def test_linker_feedback_rejects_missing_or_non_finite_joints():
@@ -79,11 +85,11 @@ def test_hand_mapping_rejects_non_finite_scalar(value):
         hand_command_from_openness(value, LEFT_CLOSED, LEFT_OPEN)
 
 
-def test_action_chunk_requires_exactly_one_finite_100_by_19_chunk():
-    chunk = np.zeros((100, 19), dtype=np.float32)
-    assert validate_action_chunk(chunk).shape == (100, 19)
-    with pytest.raises(RuntimeContractError, match="100, 19"):
-        validate_action_chunk(np.zeros((99, 19), dtype=np.float32))
+def test_action_chunk_requires_exactly_one_finite_16_by_19_chunk():
+    chunk = np.zeros((16, 19), dtype=np.float32)
+    assert validate_action_chunk(chunk).shape == (16, 19)
+    with pytest.raises(RuntimeContractError, match="16, 19"):
+        validate_action_chunk(np.zeros((15, 19), dtype=np.float32))
     chunk[3, 4] = np.nan
     with pytest.raises(RuntimeContractError, match="finite"):
         validate_action_chunk(chunk)
@@ -135,14 +141,14 @@ def test_running_robot_health_accepts_running_but_rejects_any_motor_error():
         validate_robot_health(payload, allowed_status=("Idle", "Running"))
 
 
-def test_real_and_sim_configs_are_single_chunk_and_never_execute_home():
+def test_real_and_sim_configs_are_single_16_step_chunk_and_never_execute_home():
     source = {"max_steps": 600, "sample_factor": 2, "home_position": "unsafe"}
     simulation = prepare_client_config(source, mode=1)
     real = prepare_client_config(source, mode=2)
 
     for config in (simulation, real):
-        assert config["action_horizon"] == 100
-        assert config["max_steps"] == 100
+        assert config["action_horizon"] == 16
+        assert config["max_steps"] == 16
         assert config["sample_factor"] == 1.0
         assert config["chunk_size_threshold"] == 0.0
         assert config["home_position"] == ""
@@ -150,9 +156,9 @@ def test_real_and_sim_configs_are_single_chunk_and_never_execute_home():
     assert real["mode"] == 2
 
 
-def test_single_chunk_gate_stops_exactly_after_frame_100():
-    gate = SingleChunkGate(limit=100)
-    assert all(gate.mark_published() is False for _ in range(99))
+def test_single_chunk_gate_stops_exactly_after_frame_16():
+    gate = SingleChunkGate(limit=16)
+    assert all(gate.mark_published() is False for _ in range(15))
     assert gate.mark_published() is True
     with pytest.raises(RuntimeContractError, match="already complete"):
         gate.mark_published()
@@ -161,14 +167,14 @@ def test_single_chunk_gate_stops_exactly_after_frame_100():
 def test_continuous_gate_crosses_chunk_boundary_without_completing_session():
     assert hasattr(runtime, "ChunkExecutionGate")
     assert hasattr(runtime, "EXECUTION_CONTINUOUS")
-    gate = runtime.ChunkExecutionGate(runtime.EXECUTION_CONTINUOUS, chunk_size=100)
+    gate = runtime.ChunkExecutionGate(runtime.EXECUTION_CONTINUOUS, chunk_size=16)
 
     progress = None
-    for _ in range(100):
+    for _ in range(16):
         progress = gate.mark_published()
 
     assert progress.chunk_index == 1
-    assert progress.frame_in_chunk == 100
+    assert progress.frame_in_chunk == 16
     assert progress.chunk_complete is True
     assert progress.session_complete is False
 
@@ -181,9 +187,9 @@ def test_continuous_gate_crosses_chunk_boundary_without_completing_session():
 def test_single_execution_mode_remains_bounded_to_one_chunk():
     assert hasattr(runtime, "ChunkExecutionGate")
     assert hasattr(runtime, "EXECUTION_SINGLE")
-    gate = runtime.ChunkExecutionGate(runtime.EXECUTION_SINGLE, chunk_size=100)
+    gate = runtime.ChunkExecutionGate(runtime.EXECUTION_SINGLE, chunk_size=16)
 
-    for _ in range(99):
+    for _ in range(15):
         assert gate.mark_published().session_complete is False
     assert gate.mark_published().session_complete is True
     with pytest.raises(RuntimeContractError, match="already complete"):
@@ -192,13 +198,13 @@ def test_single_execution_mode_remains_bounded_to_one_chunk():
 
 def test_continuous_config_removes_the_100_frame_session_limit():
     config = prepare_client_config(
-        {"execution_mode": "continuous", "max_steps": 100},
+        {"execution_mode": "continuous", "max_steps": 16},
         mode=2,
     )
 
     assert config["execution_mode"] == "continuous"
-    assert config["action_horizon"] == 100
-    assert config["max_steps"] > 100
+    assert config["action_horizon"] == 16
+    assert config["max_steps"] > 16
     assert config["chunk_size_threshold"] == 0.0
 
 
@@ -211,7 +217,7 @@ def test_next_chunk_waits_for_empty_queue_and_feedback_after_completion():
     assert hasattr(runtime, "should_request_next_chunk")
     common = {
         "execution_mode": "continuous",
-        "frame_in_chunk": 100,
+        "frame_in_chunk": 16,
         "chunk_completed_at": 20.0,
     }
 
@@ -250,15 +256,15 @@ def test_real_observation_gate_requires_every_model_and_feedback_buffer():
 
 def test_real_hand_feedback_is_converted_back_to_model_openness():
     assert gripper_scalars_from_feedback(
-        np.asarray(LEFT_CLOSED) / 100.0,
-        np.asarray(RIGHT_OPEN) / 100.0,
+        np.asarray(LEFT_CLOSED),
+        np.asarray(RIGHT_OPEN),
     ) == pytest.approx((0.0, 100.0))
 
 
-def test_real_linker_feedback_ratios_are_scaled_to_command_percentages():
-    feedback = np.asarray(LEFT_CLOSED, dtype=np.float64) / 100.0
-    assert normalize_hand_feedback(feedback) == pytest.approx(LEFT_CLOSED)
-    assert gripper_scalars_from_feedback(feedback, np.asarray(RIGHT_OPEN) / 100.0) == pytest.approx(
+def test_real_linker_feedback_uses_deployed_percentage_scale():
+    feedback = np.asarray(LEFT_CLOSED, dtype=np.float64)
+    assert normalize_hand_feedback(feedback) == pytest.approx(feedback)
+    assert gripper_scalars_from_feedback(feedback, np.asarray(RIGHT_OPEN)) == pytest.approx(
         (0.0, 100.0)
     )
 
@@ -279,7 +285,7 @@ def test_vendor_timed_actions_must_form_one_complete_chunk():
         def get_action(self):
             return self.value
 
-    actions = [Timed(np.zeros(19, dtype=np.float32)) for _ in range(100)]
-    assert validate_timed_actions(actions).shape == (100, 19)
-    with pytest.raises(RuntimeContractError, match="100, 19"):
+    actions = [Timed(np.zeros(19, dtype=np.float32)) for _ in range(16)]
+    assert validate_timed_actions(actions).shape == (16, 19)
+    with pytest.raises(RuntimeContractError, match="16, 19"):
         validate_timed_actions(actions[:-1])

@@ -80,15 +80,15 @@ def test_decode_observation_rejects_wrong_image_size():
 
 
 def test_group_action_chunk_uses_six_legacy_groups():
-    actions = np.arange(100 * 19, dtype=np.float32).reshape(100, 19)
+    actions = np.arange(16 * 19, dtype=np.float32).reshape(16, 19)
     grouped = group_action_chunk(actions)
     assert {key: value.shape for key, value in grouped.items()} == {
-        "waistqpos": (100, 1),
-        "left_armqpos": (100, 7),
-        "headqpos": (100, 2),
-        "right_armqpos": (100, 7),
-        "left_eefgripper": (100, 1),
-        "right_eefgripper": (100, 1),
+        "waistqpos": (16, 1),
+        "left_armqpos": (16, 7),
+        "headqpos": (16, 2),
+        "right_armqpos": (16, 7),
+        "left_eefgripper": (16, 1),
+        "right_eefgripper": (16, 1),
     }
     np.testing.assert_array_equal(grouped["headqpos"], actions[:, 8:10])
 
@@ -96,9 +96,9 @@ def test_group_action_chunk_uses_six_legacy_groups():
 @pytest.mark.parametrize(
     "actions, message",
     [
-        (np.zeros((32, 19), dtype=np.float32), "100, 19"),
-        (np.zeros((100, 18), dtype=np.float32), "100, 19"),
-        (np.full((100, 19), np.nan, dtype=np.float32), "finite"),
+        (np.zeros((32, 19), dtype=np.float32), "16, 19"),
+        (np.zeros((16, 18), dtype=np.float32), "16, 19"),
+        (np.full((16, 19), np.nan, dtype=np.float32), "finite"),
     ],
 )
 def test_group_action_chunk_rejects_invalid_output(actions, message):

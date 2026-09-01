@@ -12,7 +12,7 @@ class FakeRuntime:
 
     def predict(self, observation):
         self.calls.append(observation)
-        return np.arange(100 * 19, dtype=np.float32).reshape(100, 19)
+        return np.arange(16 * 19, dtype=np.float32).reshape(16, 19)
 
     def reset(self):
         self.reset_calls += 1
@@ -52,7 +52,7 @@ def test_simulation_lifecycle_produces_legacy_action_response():
     left_arm = reply["actions"]["qpos"]["left_armqpos"]
     assert isinstance(left_arm, list)
     assert isinstance(left_arm[0], list)
-    assert np.asarray(left_arm).shape == (100, 7)
+    assert np.asarray(left_arm).shape == (16, 7)
     assert app.handle({"type": "get_actions"})["status"] == "pending"
 
 

@@ -48,6 +48,7 @@ from act_async_infer_distributed_demo.scripts.inference_config import (
 from act_async_infer_distributed_demo.scripts.utils_distributed import log_info
 
 from .runtime import (
+    ACTION_HORIZON,
     LEFT_CLOSED,
     LEFT_OPEN,
     RIGHT_CLOSED,
@@ -59,10 +60,12 @@ from .runtime import (
     action_to_commands,
     feedback_positions_by_name,
     gripper_scalars_from_feedback,
+    hand_command_to_wire,
     prepare_client_config,
     should_request_next_chunk,
     validate_feedback_freshness,
     validate_observation_buffers,
+    validate_hands_ready,
     validate_robot_health,
     validate_robot_ready,
     validate_timed_actions,
@@ -117,7 +120,7 @@ def _setup_execution(self, client_config, server_config, _home_position):
     execution_mode = prepared.pop("execution_mode")
     prepared["end_effector_type"] = "gripper"
     self._execution_mode = execution_mode
-    self._chunk_gate = ChunkExecutionGate(execution_mode, chunk_size=100)
+    self._chunk_gate = ChunkExecutionGate(execution_mode, chunk_size=ACTION_HORIZON)
     self._received_chunk_count = 0
     self._last_chunk_completed_at = 0.0
 
@@ -125,7 +128,24 @@ def _setup_execution(self, client_config, server_config, _home_position):
         if mode == 2:
             if not getattr(self, "_latest_robot_state", None):
                 raise RuntimeContractError("real deployment has no robot state feedback")
-            validate_robot_ready(self._latest_robot_state, tolerance_rad=0.05)
+            if bool(client_config.get("skip_default_pose_check", False)):
+                self.get_logger().warning(
+                    "Real preflight: ACT default body-pose check bypassed by explicit authorization"
+                )
+            else:
+                validate_robot_ready(self._latest_robot_state, tolerance_rad=0.05)
+            if not self.hand_qpos6_left_buf or not self.hand_qpos6_right_buf:
+                raise RuntimeContractError("real deployment has no left/right hand feedback")
+            if bool(client_config.get("skip_default_pose_check", False)):
+                self.get_logger().warning(
+                    "Real preflight: ACT default hand-pose check bypassed by explicit authorization"
+                )
+            else:
+                validate_hands_ready(
+                    self.hand_qpos6_left_buf[-1][1],
+                    self.hand_qpos6_right_buf[-1][1],
+                    tolerance_percent=5.0,
+                )
             validate_observation_buffers(
                 _buffer_snapshot(self),
                 use_wrist_images=bool(prepared.get("use_hand_camera", True)),
@@ -204,10 +224,10 @@ def _ee_message(client, values):
     message.header.stamp = client._now()
     message.mode = EEJointControlMode.POSITION
     message.joint_names = [
-        "T_CMC_YAW", "T_MCP", "IF_MCP_PITCH",
+        "T_MCP", "T_CMC_YAW", "IF_MCP_PITCH",
         "MF_MCP_PITCH", "RF_MCP_PITCH", "LF_MCP_PITCH",
     ]
-    message.values = [float(value) for value in values]
+    message.values = [float(value) for value in hand_command_to_wire(values)]
     return message
 
 
@@ -245,7 +265,7 @@ def _get_validated_actions(self):
         self._received_chunk_count += 1
         log_info(
             "Validated finite ACT action chunk "
-            f"{self._received_chunk_count} with shape (100, 19)"
+            f"{self._received_chunk_count} with shape ({ACTION_HORIZON}, 19)"
         )
     return timed_actions
 
@@ -260,7 +280,9 @@ def _finish_single_chunk(self, mode_name):
     self.shutdown_event.set()
     self._inference_running = False
     self._set_state(RobotState.IDLE)
-    log_info(f"Single {mode_name} action chunk completed; stopped after exactly 100 frames")
+    log_info(
+        f"Single {mode_name} action chunk completed; stopped after exactly {ACTION_HORIZON} frames"
+    )
 
 
 def _halt_on_runtime_error(self, error):
@@ -303,7 +325,7 @@ def _execute_guarded_action(self, timed_action):
     progress = self._chunk_gate.mark_published()
     log_info(
         f"Executed guarded real action global_frame={progress.global_frame} "
-        f"chunk={progress.chunk_index} frame={progress.frame_in_chunk}/100 "
+        f"chunk={progress.chunk_index} frame={progress.frame_in_chunk}/{ACTION_HORIZON} "
         f"left_open={timed_action.get_action()[-2]:.3f} "
         f"right_open={timed_action.get_action()[-1]:.3f}"
     )
@@ -334,6 +356,11 @@ def install_hooks():
     OptimizedRobotClient.get_actions = _get_validated_actions
     OptimizedRobotClient.exec_action = _execute_guarded_action
 
+    # The service main loop is the sole ROS executor spinner.  The vendor
+    # start() method otherwise launches a second ros_spin thread, which races
+    # rclpy's generator and fails with ``generator already executing``.
+    OptimizedRobotClient.ros_spin = lambda self: None
+
 
 def main():
     parser = argparse.ArgumentParser()
@@ -349,8 +376,10 @@ def main():
     log_info(f"XWiz dual-mode W1 client listening on 0.0.0.0:{config.manager_port}")
     try:
         while rclpy.ok():
+            # Keep one and only one executor spinner for preflight callbacks
+            # and inference-time sensor updates.
             rclpy.spin_once(client, timeout_sec=0.1)
-            time.sleep(0.01)
+            time.sleep(0.1)
     finally:
         client.stop()
 

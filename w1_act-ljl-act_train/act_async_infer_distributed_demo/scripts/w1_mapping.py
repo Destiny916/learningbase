@@ -24,8 +24,8 @@ origin_joint_names = [
 ]
 
 hand_joint_names = [
-    "T_CMC_YAW",
     "T_MCP",
+    "T_CMC_YAW",
     "IF_MCP_PITCH",
     "MF_MCP_PITCH",
     "RF_MCP_PITCH",
@@ -122,7 +122,7 @@ class JointNamesKey(Enum):
     W1_RIGHT_J6 = "RIGHT_J6"
     W1_RIGHT_J7 = "RIGHT_J7"
     W1_RIGHT_num = [13, 19]
-    
+
 
 
 
@@ -304,7 +304,7 @@ class TrajectoryKeys:
 
     GRIPPER_KEYS = ["LEFT_GRIPPER", "RIGHT_GRIPPER"]
 
-    HAND_JOINT_NAMES = ["T_CMC_YAW", "T_MCP", "IF_MCP_PITCH", "MF_MCP_PITCH", "RF_MCP_PITCH", "LF_MCP_PITCH"]
+    HAND_JOINT_NAMES = ["T_MCP", "T_CMC_YAW", "IF_MCP_PITCH", "MF_MCP_PITCH", "RF_MCP_PITCH", "LF_MCP_PITCH"]
     PIPER_LEFT_JOINT = ["PIPER_LEFT"]
     PIPER_RIGHT_JOINT = ["PIPER_RIGHT"]
 
@@ -314,4 +314,3 @@ class ModelNameKeys(Enum):
     BRAIN = "brain"
     CEREBELLUM = "cerebellum"
     ENCODERS = "encoders"
-    

@@ -88,7 +88,7 @@ class XWizActServerApp:
             self.latest_timestamp = float(request.get("timestamp", 0.0))
             self.latest_timestep = int(request.get("timestep", 0))
             LOGGER.info(
-                "inference completed timestep=%d action_shape=(100,19)",
+                "inference completed timestep=%d action_shape=(16,19)",
                 self.latest_timestep,
             )
         return {"status": "received", "inferred": inferred}

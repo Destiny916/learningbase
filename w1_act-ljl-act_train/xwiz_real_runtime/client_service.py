@@ -281,6 +281,10 @@ def _aggregate_action_queues_async100(self, incoming_actions, _aggregate_fn=None
         old = {int(a.get_timestep()): a for a in self.action_queue.queue}
     out = dict(old)
     live = expanded[first_live:]
+    # The final two ACT dimensions are left/right hand openness scalars.
+    # Preserve the new policy hand command directly; only body dimensions use
+    # LIPO blending at a chunk boundary.
+    blend_indices = np.arange(max(0, expanded.shape[1] - 2), dtype=np.int64)
     blend_len = 0
     for offset in range(min(blend_points, len(live))):
         if (start + first_live + offset) not in old:
@@ -290,7 +294,11 @@ def _aggregate_action_queues_async100(self, incoming_actions, _aggregate_fn=None
         timestep = start + first_live + i
         if i < blend_len and timestep in old:
             w = float(i + 1) / float(blend_points)
-            value = old[timestep].get_action() * (1.0 - w) + action * w
+            value = action.copy()
+            value[blend_indices] = (
+                old[timestep].get_action()[blend_indices] * (1.0 - w)
+                + action[blend_indices] * w
+            )
         else:
             value = action
         out[timestep] = TimedAction(

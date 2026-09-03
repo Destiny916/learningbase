@@ -47,3 +47,18 @@ def test_no_blend_when_old_chunk_has_finished():
     assert first_live == 30
     assert blend_len == 0
     np.testing.assert_allclose(merged[0], 1.0)
+
+
+def test_blend_excludes_left_and_right_hand_scalar_dimensions():
+    old = {t: np.zeros(19, dtype=np.float32) for t in range(0, 220)}
+    new = np.ones((200, 19), dtype=np.float32)
+    merged, _, blend_len = align_and_blend(
+        old_queue=old,
+        new_actions=new,
+        chunk_start_timestep=0,
+        latest_executed_timestep=-1,
+        blend_indices=np.arange(17),
+    )
+    assert blend_len == BLEND_CONTROL_POINTS
+    np.testing.assert_allclose(merged[0, :17], 1.0 / 30.0)
+    np.testing.assert_allclose(merged[0, 17:], 1.0)

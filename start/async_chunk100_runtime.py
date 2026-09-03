@@ -36,6 +36,7 @@ def should_prefetch(queue_size: int, remaining: int = REPLAN_REMAINING_CONTROL_P
 def align_and_blend(
     *, old_queue: dict[int, np.ndarray], new_actions: np.ndarray,
     chunk_start_timestep: int, latest_executed_timestep: int,
+    blend_indices: object = None,
 ) -> tuple[np.ndarray, int, int]:
     new_array = np.asarray(new_actions, dtype=np.float32)
     if new_array.shape != (CONTROL_HORIZON, 19) or not np.isfinite(new_array).all():
@@ -44,6 +45,12 @@ def align_and_blend(
     if first_live >= CONTROL_HORIZON:
         return np.empty((0, 19), dtype=np.float32), first_live, 0
     live = new_array[first_live:].copy()
+    if blend_indices is None:
+        indices = np.arange(new_array.shape[1], dtype=np.int64)
+    else:
+        indices = np.asarray(blend_indices, dtype=np.int64)
+        if indices.ndim != 1 or np.any(indices < 0) or np.any(indices >= new_array.shape[1]):
+            raise ValueError("blend_indices must be valid 1D action indices")
     blend_len = min(BLEND_CONTROL_POINTS, len(live))
     if blend_len and old_queue:
         old_values = []
@@ -58,5 +65,8 @@ def align_and_blend(
         old_values = old_values[:blend_len]
         old_array = np.stack(old_values)
         weights = np.arange(1, blend_len + 1, dtype=np.float32) / float(BLEND_CONTROL_POINTS)
-        live[:blend_len] = old_array * (1.0 - weights[:, None]) + live[:blend_len] * weights[:, None]
+        live[:blend_len, indices] = (
+            old_array[:, indices] * (1.0 - weights[:, None])
+            + live[:blend_len, indices] * weights[:, None]
+        )
     return live, first_live, blend_len

@@ -3,7 +3,9 @@
 from __future__ import annotations
 
 import argparse
+from dataclasses import fields, is_dataclass
 import json
+import os
 from pathlib import Path
 import sys
 import types
@@ -21,7 +23,8 @@ REQUIRED_CHECKPOINT_FILES = (
     "policy_preprocessor.json",
     "policy_postprocessor.json",
 )
-EXPECTED_ACTION_SHAPE = (16, 19)
+EXPECTED_ACTION_HORIZON = int(os.environ.get("XWIZ_ACTION_HORIZON", "16"))
+EXPECTED_ACTION_SHAPE = (EXPECTED_ACTION_HORIZON, 19)
 NORMALIZATION_EPS = 1e-8
 
 
@@ -109,9 +112,9 @@ def preprocess_observation_image(
     elif key in {"observation.images.cam_hand_left", "observation.images.cam_hand_right"}:
         # The deployed wrist cameras have different native aspect ratios:
         # physical left wrist is 640x360 and physical right wrist is 640x480.
-        # Training-time conversion stretches each image to a square using its
-        # corresponding source side, then resizes to the model feature size.
-        side = max(pil.width, pil.height)
+        # Training-time conversion stretches each image to a square using the
+        # image height: 640x360 -> 360x360 and 640x480 -> 480x480.
+        side = pil.height
         pil = pil.resize((side, side), Image.Resampling.LANCZOS)
     pil = pil.resize((width, height), Image.Resampling.LANCZOS)
     return np.asarray(pil, dtype=np.uint8)
@@ -131,6 +134,13 @@ def _draccus_decoder(config_class: Any, raw: dict[str, Any]) -> Any:
             return value
 
         draccus.decode.register(annotation, decode_literal)
+    # Training checkpoints may carry auxiliary EE/FK and vision metadata that
+    # the deployed LeRobot ACTConfig does not declare.  Those fields are
+    # contract metadata, not constructor arguments; strict decoding otherwise
+    # prevents the otherwise compatible weights from loading on PC2.
+    if is_dataclass(config_class):
+        allowed = {field.name for field in fields(config_class)}
+        raw = {key: value for key, value in raw.items() if key in allowed}
     return draccus.decode(config_class, raw)
 
 
@@ -289,12 +299,11 @@ class LeRobotActRuntime:
 
 
 def _synthetic_observation() -> dict[str, np.ndarray]:
-    image = np.zeros((360, 640, 3), dtype=np.uint8)
     return {
         "observation.state": np.zeros(19, dtype=np.float32),
-        "observation.images.cam_high_left": image.copy(),
-        "observation.images.cam_hand_left": image.copy(),
-        "observation.images.cam_hand_right": image.copy(),
+        "observation.images.cam_high_left": np.zeros((540, 960, 3), dtype=np.uint8),
+        "observation.images.cam_hand_left": np.zeros((360, 640, 3), dtype=np.uint8),
+        "observation.images.cam_hand_right": np.zeros((480, 640, 3), dtype=np.uint8),
     }
 
 

@@ -9,6 +9,7 @@ from queue import Empty, Queue
 import sys
 import time
 import types
+import os
 
 import cv2
 import numpy as np
@@ -68,6 +69,7 @@ from .runtime import (
 
 
 HAND_NAMES = ("T_MCP", "T_CMC_YAW", "IF_MCP_PITCH", "MF_MCP_PITCH", "RF_MCP_PITCH", "LF_MCP_PITCH")
+ACTION_HORIZON = int(os.environ.get("XWIZ_ACTION_HORIZON", "16"))
 _vendor_setup = OptimizedRobotClient._cmd_setup_config
 _vendor_joint_callback = OptimizedRobotClient.joint_state_callback
 
@@ -224,23 +226,25 @@ def _get_actions(self):
         return None
     if response.get("protocol_version") != 2 or response.get("action_representation") != "absolute":
         raise Client160000Error("server did not return protocol-v2 absolute actions")
-    if response.get("action_shape") != [16, 19]:
-        raise Client160000Error("server action_shape must be [16, 19]")
+    if response.get("action_shape") != [ACTION_HORIZON, 19]:
+        raise Client160000Error(f"server action_shape must be [{ACTION_HORIZON}, 19]")
     grouped = response["actions"]["qpos"]
     order = ("waistqpos", "left_armqpos", "headqpos", "right_armqpos", "left_eefgripper", "right_eefgripper")
     rows = []
-    for step in range(16):
+    for step in range(ACTION_HORIZON):
         rows.append(np.concatenate([np.asarray(grouped[key][step], dtype=np.float32) for key in order]))
     actions = np.asarray(rows, dtype=np.float32)
-    if actions.shape != (16, 19) or not np.isfinite(actions).all():
-        raise Client160000Error("received actions must be finite 16x19")
+    if actions.shape != (ACTION_HORIZON, 19) or not np.isfinite(actions).all():
+        raise Client160000Error(f"received actions must be finite {ACTION_HORIZON}x19")
     self.current_joint_order = list(order)
     return self._time_action_chunk(float(response["timestamp"]), actions, int(response["timestep"]))
 
 
 def _direct_queue(self, incoming_actions, aggregate_fn=None):
-    if len(incoming_actions) != 16:
-        raise Client160000Error("one chunk must contain exactly 16 actions")
+    if len(incoming_actions) != ACTION_HORIZON:
+        raise Client160000Error(
+            f"one chunk must contain exactly {ACTION_HORIZON} actions"
+        )
     queue = Queue()
     for action in incoming_actions:
         queue.put(TimedAction(action.timestamp, action.timestep, np.asarray(action.action).copy()))
@@ -248,7 +252,7 @@ def _direct_queue(self, incoming_actions, aggregate_fn=None):
         if not self.action_queue.empty():
             raise Client160000Error("prior action queue must be empty before next chunk")
         self.action_queue = queue
-    self.action_chunk_size = 16
+    self.action_chunk_size = ACTION_HORIZON
     self.first_get_actions = False
 
 
@@ -290,7 +294,7 @@ def _exec_action(self, timed_action):
 
 def _setup(self, client_config, server_config, _home_position):
     required = {
-        "mode": 2, "action_horizon": 16,
+        "mode": 2, "action_horizon": ACTION_HORIZON,
         "sample_factor": 1, "chunk_size_threshold": 0,
     }
     for key, expected in required.items():
@@ -316,7 +320,7 @@ def _setup(self, client_config, server_config, _home_position):
     self._feedback_160000 = AdjacentFeedbackBuffer()
     self._gate_160000 = Chunk16Gate()
     server_config = dict(server_config)
-    server_config.update(data_type="real", protocol_version=2, action_horizon=16)
+    server_config.update(data_type="real", protocol_version=2, action_horizon=ACTION_HORIZON)
     return _vendor_setup(self, client_config, server_config, "")
 
 

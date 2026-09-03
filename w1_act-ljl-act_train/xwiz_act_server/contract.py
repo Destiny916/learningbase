@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping
+import os
 from typing import Any
 
 import numpy as np
@@ -10,7 +11,7 @@ import numpy as np
 
 IMAGE_WIDTH = 640
 IMAGE_HEIGHT = 360
-ACTION_SHAPE = (16, 19)
+ACTION_SHAPE = (int(os.environ.get("XWIZ_ACTION_HORIZON", "16")), 19)
 
 STATE_GROUPS = (
     ("waistqpos", 1),

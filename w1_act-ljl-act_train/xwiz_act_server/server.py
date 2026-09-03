@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import socket
+import os
 from typing import Any, Protocol
 
 from .contract import ContractError, decode_observation, group_action_chunk
@@ -87,9 +88,10 @@ class XWizActServerApp:
             self.latest_actions = group_action_chunk(actions)
             self.latest_timestamp = float(request.get("timestamp", 0.0))
             self.latest_timestep = int(request.get("timestep", 0))
+            horizon = int(os.environ.get("XWIZ_ACTION_HORIZON", "16"))
             LOGGER.info(
-                "inference completed timestep=%d action_shape=(16,19)",
-                self.latest_timestep,
+                "inference completed timestep=%d action_shape=(%d,19)",
+                self.latest_timestep, horizon,
             )
         return {"status": "received", "inferred": inferred}
 

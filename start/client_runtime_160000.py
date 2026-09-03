@@ -8,10 +8,14 @@ from dataclasses import dataclass
 from typing import Any
 
 import numpy as np
+import os
 
 
 class Client160000Error(RuntimeError):
     """Raised when PC1 cannot construct a safe protocol-v2 request."""
+
+
+ACTION_HORIZON = int(os.environ.get("XWIZ_ACTION_HORIZON", "16"))
 
 
 def latest_fresh_image(
@@ -187,15 +191,17 @@ class Chunk16Gate:
 
     def mark_published(self) -> ChunkProgress:
         self.published += 1
-        frame = (self.published - 1) % 16 + 1
-        return ChunkProgress(self.published, frame, frame == 16)
+        frame = (self.published - 1) % ACTION_HORIZON + 1
+        return ChunkProgress(self.published, frame, frame == ACTION_HORIZON)
 
     def mark_requested(self, current_feedback_sequence: int) -> None:
         self.last_requested_feedback_sequence = int(current_feedback_sequence)
 
     def mark_chunk_completed(self, newest_feedback_sequence: int) -> None:
-        if self.published == 0 or self.published % 16 != 0:
-            raise Client160000Error("chunk completion must occur after exactly 16 frames")
+        if self.published == 0 or self.published % ACTION_HORIZON != 0:
+            raise Client160000Error(
+                f"chunk completion must occur after exactly {ACTION_HORIZON} frames"
+            )
         self.chunk_completed_feedback_sequence = int(newest_feedback_sequence)
 
     def can_request(self, *, queue_size: int, newest_feedback_sequence: int) -> bool:
@@ -204,7 +210,7 @@ class Chunk16Gate:
         if self.published == 0:
             return newest_feedback_sequence >= 1
         return (
-            self.published % 16 == 0
+            self.published % ACTION_HORIZON == 0
             and newest_feedback_sequence > self.last_requested_feedback_sequence
             and newest_feedback_sequence > self.chunk_completed_feedback_sequence
         )

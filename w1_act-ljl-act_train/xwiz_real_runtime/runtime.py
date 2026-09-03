@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+import os
 from typing import Mapping, Sequence
 
 import numpy as np
@@ -16,7 +17,7 @@ EXECUTION_SINGLE = "single"
 EXECUTION_CONTINUOUS = "continuous"
 # Vendor worker loops require a finite numeric max_steps value.
 CONTINUOUS_MAX_STEPS = 9_007_199_254_740_991
-ACTION_HORIZON = 16
+ACTION_HORIZON = int(os.environ.get("XWIZ_ACTION_HORIZON", "16"))
 GRIPPER_OPENNESS_CLIP_THRESHOLD = 95.0
 
 
@@ -80,6 +81,11 @@ BODY_LIMITS = {
     "RIGHT_J6": (-0.7853981634, 0.7853981634),
     "RIGHT_J7": (-1.0471975512, 1.5707963268),
 }
+# v024 hardware/URDF limits are tighter than the legacy software table by
+# roughly 0.01 rad on the arm wrist joints (notably J6/J7).  Keep every
+# command inside that v024 envelope so streaming/Ruckig tracking cannot push
+# a target onto the controller's PositionOverLimit boundary.
+LIMIT_SAFETY_MARGIN = 1e-2
 
 
 @dataclass(frozen=True)
@@ -232,7 +238,8 @@ def action_to_commands(action: object) -> ActionCommands:
     if values.shape != (19,) or not np.isfinite(values).all():
         raise RuntimeContractError("action frame must contain 19 finite values")
     body = tuple(
-        float(np.clip(value, *BODY_LIMITS[name]))
+        float(np.clip(value, BODY_LIMITS[name][0] + LIMIT_SAFETY_MARGIN,
+                      BODY_LIMITS[name][1] - LIMIT_SAFETY_MARGIN))
         for name, value in zip(BODY_ORDER, values[:17], strict=True)
     )
     return ActionCommands(
@@ -322,8 +329,14 @@ def prepare_client_config(config: Mapping[str, object], mode: int) -> dict[str, 
             if execution_mode == EXECUTION_CONTINUOUS
             else ACTION_HORIZON
         ),
-        sample_factor=1.0,
-        chunk_size_threshold=0.0,
+        sample_factor=(
+            float(config.get("sample_factor", 1.0))
+            if os.environ.get("XWIZ_ASYNC_REPLAN") == "1" else 1.0
+        ),
+        chunk_size_threshold=(
+            float(config.get("chunk_size_threshold", 0.0))
+            if os.environ.get("XWIZ_ASYNC_REPLAN") == "1" else 0.0
+        ),
         home_position="",
     )
     return prepared

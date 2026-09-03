@@ -4,9 +4,11 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 from pathlib import Path
-from queue import Empty
+from queue import Empty, Queue
 import sys
+import threading
 import time
 import types
 
@@ -30,6 +32,7 @@ if _lipo_module_name not in sys.modules:
     sys.modules[_lipo_module_name] = _stub
 
 import rclpy
+from rclpy.executors import MultiThreadedExecutor
 from end_effector_interfaces.msg import EEFeedback, EEJointControl, EEJointControlMode
 import end_effector_interfaces.msg as ee_messages
 
@@ -45,7 +48,7 @@ from act_async_infer_distributed_demo.scripts.inference_config import (
     RequestType,
     ResponseKey,
 )
-from act_async_infer_distributed_demo.scripts.utils_distributed import log_info
+from act_async_infer_distributed_demo.scripts.utils_distributed import log_info, TimedAction
 
 from .runtime import (
     ACTION_HORIZON,
@@ -70,6 +73,7 @@ from .runtime import (
     validate_robot_ready,
     validate_timed_actions,
 )
+from .async_chunk100 import expand_policy_chunk, BLEND_CONTROL_POINTS
 
 
 _vendor_setup = OptimizedRobotClient._cmd_setup_config
@@ -90,6 +94,27 @@ def _buffer_snapshot(client):
         "left_hand": client.hand_qpos6_left_buf,
         "right_hand": client.hand_qpos6_right_buf,
     }
+
+
+def _wait_for_real_feedback(self, timeout_seconds: float = 8.0):
+    """Allow a freshly started ROS client to receive its first sensor samples."""
+    deadline = time.monotonic() + float(timeout_seconds)
+    while time.monotonic() < deadline:
+        if (
+            getattr(self, "_latest_robot_state", None)
+            and self.hand_qpos6_left_buf
+            and self.hand_qpos6_right_buf
+        ):
+            try:
+                validate_observation_buffers(
+                    _buffer_snapshot(self),
+                    use_wrist_images=True,
+                )
+                return
+            except RuntimeContractError:
+                pass
+        time.sleep(0.05)
+    raise RuntimeContractError("real feedback/observations not ready after client startup")
 
 
 def _joint_state_callback(self, message):
@@ -126,6 +151,7 @@ def _setup_execution(self, client_config, server_config, _home_position):
 
     try:
         if mode == 2:
+            _wait_for_real_feedback(self)
             if not getattr(self, "_latest_robot_state", None):
                 raise RuntimeContractError("real deployment has no robot state feedback")
             if bool(client_config.get("skip_default_pose_check", False)):
@@ -219,6 +245,73 @@ def _ready_for_synchronous_chunk(self):
     return _vendor_ready_to_send_observation(self)
 
 
+def _ready_for_async_replan(self):
+    """Use vendor queue-threshold trigger for the isolated async100 mode."""
+    return _vendor_ready_to_send_observation(self)
+
+
+def _async_observation_check_loop(self):
+    """Queue-threshold checker without the vendor ActionLiPo initializer."""
+    self.start_barrier.wait()
+    interval = 1.0 / max(float(self.observation_check_frequency), 1.0)
+    while self.running and self.current_step < self.cfg.max_steps:
+        try:
+            self._ready_to_send_observation()
+        except Exception as exc:
+            self._set_state(RobotState.ERROR, f"异步重规划检查失败: {exc}")
+            return
+        time.sleep(interval)
+
+
+def _aggregate_action_queues_async100(self, incoming_actions, _aggregate_fn=None):
+    """Aggregate an async-100 chunk using launcher-selected sampling."""
+    if not incoming_actions:
+        return
+    policy = np.stack([a.get_action() for a in incoming_actions]).astype(np.float32)
+    sample_factor = int(os.environ.get("XWIZ_ASYNC_SAMPLE_FACTOR", "2"))
+    blend_points = int(os.environ.get("XWIZ_ASYNC_BLEND_POINTS", str(BLEND_CONTROL_POINTS)))
+    expanded = expand_policy_chunk(policy, sample_factor=sample_factor)
+    start = int(incoming_actions[0].get_timestep())
+    dt = self.environment_dt / 2.0
+    latest = int(getattr(self, "latest_action", -1))
+    first_live = max(0, latest - start + 1)
+    if first_live >= len(expanded):
+        return
+    with self.action_queue_lock:
+        old = {int(a.get_timestep()): a for a in self.action_queue.queue}
+    out = dict(old)
+    live = expanded[first_live:]
+    blend_len = 0
+    for offset in range(min(blend_points, len(live))):
+        if (start + first_live + offset) not in old:
+            break
+        blend_len += 1
+    for i, action in enumerate(live):
+        timestep = start + first_live + i
+        if i < blend_len and timestep in old:
+            w = float(i + 1) / float(blend_points)
+            value = old[timestep].get_action() * (1.0 - w) + action * w
+        else:
+            value = action
+        out[timestep] = TimedAction(
+            timestamp=float(incoming_actions[0].get_timestamp()) + (first_live + i) * dt,
+            timestep=timestep,
+            action=value,
+        )
+    future = Queue()
+    for timestep in sorted(out):
+        if timestep > latest:
+            future.put(out[timestep])
+    with self.action_queue_lock:
+        self.action_queue = future
+    log_info(
+        f"Async100 chunk aligned start={start} latest={latest} "
+        f"skipped_prefix={first_live} blend_points={blend_len} "
+        f"policy=100 control={len(expanded)} sample_factor={sample_factor} "
+        f"blend_points={blend_points}"
+    )
+
+
 def _ee_message(client, values):
     message = EEJointControl()
     message.header.stamp = client._now()
@@ -258,7 +351,7 @@ def _get_validated_actions(self):
         if getattr(self, "_execution_mode", EXECUTION_SINGLE) == EXECUTION_CONTINUOUS:
             with self.action_queue_lock:
                 queued = self.action_queue.qsize()
-            if queued != 0:
+            if queued != 0 and os.environ.get("XWIZ_ASYNC_REPLAN") != "1":
                 raise RuntimeContractError(
                     "continuous synchronous mode received a chunk before the prior queue emptied"
                 )
@@ -351,7 +444,12 @@ def install_hooks():
     OptimizedRobotClient.hand_qpos6_right_callback = _hand_feedback_callback("right")
     OptimizedRobotClient._cmd_setup_config = _setup_execution
     OptimizedRobotClient.get_real_obs = _get_model_observation
-    OptimizedRobotClient._ready_to_send_observation = _ready_for_synchronous_chunk
+    if os.environ.get("XWIZ_ASYNC_REPLAN") == "1":
+        OptimizedRobotClient._ready_to_send_observation = _ready_for_async_replan
+        OptimizedRobotClient._aggregate_action_queues = _aggregate_action_queues_async100
+        OptimizedRobotClient.observation_check_loop = _async_observation_check_loop
+    else:
+        OptimizedRobotClient._ready_to_send_observation = _ready_for_synchronous_chunk
     OptimizedRobotClient.publish_gripper_position = _publish_gripper_openness
     OptimizedRobotClient.get_actions = _get_validated_actions
     OptimizedRobotClient.exec_action = _execute_guarded_action
@@ -374,13 +472,17 @@ def main():
     client = OptimizedRobotClient(config)
     client._start_manager_listener()
     log_info(f"XWiz dual-mode W1 client listening on 0.0.0.0:{config.manager_port}")
+    executor = MultiThreadedExecutor(num_threads=2)
+    executor.add_node(client)
+    ros_thread = threading.Thread(target=executor.spin, daemon=True)
+    ros_thread.start()
     try:
         while rclpy.ok():
-            # Keep one and only one executor spinner for preflight callbacks
-            # and inference-time sensor updates.
-            rclpy.spin_once(client, timeout_sec=0.1)
             time.sleep(0.1)
     finally:
+        executor.shutdown()
+        ros_thread.join(timeout=2.0)
+        executor.remove_node(client)
         client.stop()
 
 

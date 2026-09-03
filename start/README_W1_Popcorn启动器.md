@@ -1,6 +1,6 @@
-# W1 Popcorn 三套 PC1/PC2 启动器
+# W1 Popcorn PC1/PC2 启动器索引
 
-这些文件是独立归档，默认不会覆盖 `/home/dexforce/w1/w1_act` 中已有的两个启动器。
+这些文件是独立归档，默认不会覆盖 `/home/dexforce/w1/w1_act` 中已有的启动器。每个 `.sh` 文件顶部均标注运行主机、模型、动作块和执行策略。
 完整使用说明见：
 `../howtotrain/W1_Popcorn三模型_PC1_PC2推理部署总说明.md`。
 
@@ -11,6 +11,20 @@
 | 500000（旧 ACT） | `pc2_server_500000_absolute.sh` | `pc1_client_500000_absolute.sh` | `control_500000_absolute.py` | 绝对位姿；当前 PC2 artifact 已核对 chunk 16，替换权重后仍以 `config.json` 为准 |
 | 200000（ACT async100） | `pc2_server_200000_chunk100.sh` | `pc1_client_200000_async100.sh` | `control_200000_async100.py` | 100 策略点，200 控制点，异步重规划；PC1 manager 端口 8896 |
 | 200000（ACT async100 无插值） | 同上 | `pc1_client_200000_nointerp_async.sh` | `control_200000_nointerp_async.py` | 100 策略点，100 控制点，剩余 15 点触发，重叠 15 点线性融合；PC1 manager 端口 8897 |
+
+## 启动器类型速查
+
+| 文件组 | 主机 | 类型/用途 | 动作执行逻辑 |
+|---|---|---|---|
+| `pc2_server_*.sh` | PC2 | GPU policy server | 只加载 checkpoint 并返回动作，不发布 ROS 或电机命令 |
+| `pc1_client_180000*`, `pc1_client_220000*` | PC1 | DINOv3 relative 客户端 | 相邻真实反馈形成相对臂关节 state；动作反归一化、还原绝对目标并限位后发布 |
+| `pc1_client_500000_absolute.sh` | PC1 | 旧 ACT absolute 客户端 | state/action 按绝对值处理，不做增量还原 |
+| `pc1_client_200000_sync100.sh` | PC1 | 100 点同步客户端 | 当前 100 点执行完成后才请求下一块，不插值、不提前请求 |
+| `pc1_client_200000_async100.sh` | PC1 | 100 点异步+插值客户端 | 100 策略点以 `sample_factor=2` 变为 200 控制点；剩 30 控制点请求下一块；身体最多 30 点 LIPO，手部标量不融合 |
+| `pc1_client_200000_nointerp_async.sh` | PC1 | 100 点异步无插值客户端 | 100 策略点直接执行；剩 15 点请求下一块；身体最多 15 点 LIPO，手部标量不融合 |
+| `pc1_client_200000_chunk100.sh`, `pc1_client_500000_chunk100.sh` | PC1 | 100 点同步块客户端 | 每块 100 点直接执行；不启用异步重规划和融合 |
+
+`control_*.py` 仅负责 PC1 manager 的 `status/start/stop`，不是模型服务；`config_*.json` 与 `client_runtime_*.json` 是参数快照，实际值以启动器传入配置为准。
 
 ## 归档内文件
 

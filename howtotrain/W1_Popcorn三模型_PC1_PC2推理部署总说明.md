@@ -1,5 +1,8 @@
 # W1 Popcorn 三模型 PC1/PC2 推理部署总说明
 
+启动器逐文件索引、类型差异和异步逻辑见：
+`W1_Popcorn启动器类型与推理逻辑.md`。
+
 本文对应 `/home/wengyikun/workplace/joint_songling/start` 中的三套独立启动器：
 
 1. `220000`：ACT-DINOv3，包含 EE pose/FK 辅助损失，relative arm joints，chunk 16；

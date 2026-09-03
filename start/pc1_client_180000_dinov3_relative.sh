@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 类型：PC1 / ACT-DINOv3 relative / chunk16 同步客户端。
+# 逻辑：上传三路预处理图像与 19D state；相对臂关节由服务端按相邻真实反馈处理，返回绝对目标后限位发布。
 set -euo pipefail
 
 W1_ACT_ROOT="${W1_ACT_ROOT:-/home/dexforce/w1/w1_act}"

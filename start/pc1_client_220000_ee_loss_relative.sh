@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 类型：PC1 / ACT-DINOv3 EE/FK-loss relative / chunk16 同步客户端。
+# 逻辑：EE/FK 仅为训练辅助损失；部署输出仍是 19D 动作，身体限位后发布，手部只传 scalar。
 set -euo pipefail
 
 W1_ACT_ROOT="${W1_ACT_ROOT:-/home/dexforce/w1/w1_act}"

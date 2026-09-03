@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 类型：PC2 / ACT-DINOv3 180000 relative policy server（默认端口 8892）。
+# 逻辑：校验权重与 relative q01/q99 后加载 CUDA 模型，只返回动作，不控制机器人。
 set -euo pipefail
 
 W1_ACT_ROOT="${W1_ACT_ROOT:-/home/dexforce/w1/w1_act}"

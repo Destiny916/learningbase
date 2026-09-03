@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 类型：PC2 / 500000 旧 ACT absolute policy server（默认端口 8889）。
+# 逻辑：按旧 checkpoint 自带 processor 处理绝对 state/action，不套用 relative q01/q99。
 set -euo pipefail
 
 W1_ACT_ROOT="${W1_ACT_ROOT:-/home/dexforce/w1/w1_act}"

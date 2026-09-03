@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 类型：PC2 / ACT 200000 chunk100 policy server（默认端口 8894）。
+# 逻辑：返回 100×19 action chunk；PC2 不发布 ROS 控制。
 set -euo pipefail
 W1_ACT_ROOT="${W1_ACT_ROOT:-/home/dexforce/w1/w1_act}"
 RUNTIME_DEPS="${RUNTIME_DEPS:-/home/dexforce/.local/share/xwiz-act-server/runtime-deps}"

@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 类型：PC1 / ACT 200000 chunk100 同步客户端。
+# 逻辑：100 点完整执行后才请求下一块；关闭异步重规划、插值和融合。
 set -euo pipefail
 W1_ACT_ROOT="${W1_ACT_ROOT:-/home/dexforce/w1/w1_act}"
 CONFIG_PATH="${CONFIG_PATH:-${W1_ACT_ROOT}/direct_runtime/client_runtime_200000_sync100.json}"

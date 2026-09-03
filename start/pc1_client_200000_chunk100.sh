@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 类型：PC1 / ACT 200000 chunk100 同步连续客户端。
+# 逻辑：100 点直接执行；不设置 async 环境变量，不做提前请求或 LIPO。
 set -euo pipefail
 W1_ACT_ROOT="${W1_ACT_ROOT:-/home/dexforce/w1/w1_act}"
 CONFIG_PATH="${CONFIG_PATH:-${W1_ACT_ROOT}/direct_runtime/client_runtime_200000_chunk100.json}"

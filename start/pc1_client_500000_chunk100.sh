@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 类型：PC1 / 500000 ACT chunk100 同步客户端。
+# 逻辑：100 点直接执行；该变体仅适用于实际 config.json 声明 chunk100 的 artifact。
 set -euo pipefail
 W1_ACT_ROOT="${W1_ACT_ROOT:-/home/dexforce/w1/w1_act}"
 CONFIG_PATH="${CONFIG_PATH:-${W1_ACT_ROOT}/direct_runtime/client_runtime_500000_chunk100.json}"

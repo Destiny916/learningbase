@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 类型：PC2 / ACT-DINOv3 220000 EE/FK-loss relative policy server（默认端口 8889）。
+# 逻辑：EE/FK 是训练辅助项；服务端只输出部署所需 19D action chunk。
 set -euo pipefail
 
 W1_ACT_ROOT="${W1_ACT_ROOT:-/home/dexforce/w1/w1_act}"

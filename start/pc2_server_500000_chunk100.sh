@@ -1,4 +1,6 @@
 #!/usr/bin/env bash
+# 类型：PC2 / ACT 500000 chunk100 policy server（默认端口 8894）。
+# 逻辑：仅当 checkpoint config.json 确认 chunk100 时使用；PC2 只推理不控机。
 set -euo pipefail
 W1_ACT_ROOT="${W1_ACT_ROOT:-/home/dexforce/w1/w1_act}"
 RUNTIME_DEPS="${RUNTIME_DEPS:-/home/dexforce/.local/share/xwiz-act-server/runtime-deps}"
